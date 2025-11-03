@@ -1,5 +1,3 @@
-//第8题
-
 #include<stdio.h>
 #include<stdlib.h>
 
