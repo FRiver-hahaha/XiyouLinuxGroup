@@ -1,34 +1,59 @@
-# include<stdio.h>
+// 16
 
-int add(int a,int b);
-int mutiply(int a,int b);
-void Callback(int (*pFun)(int,int));
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
 
-int main() {
-    int input = 0;
-    scanf("%d",&input);
-    switch(input) {
-        case 1:Callback(add);break;
-        case 2:Callback(mutiply);break;
+void Toupper(char* s);
+void Tolower(char* s);
+
+int main(int argc,char *argv[]) {
+    FILE* fp;
+    fp = fopen("test.txt","r");
+    char s[100];
+    while(fgets(s,100,fp) != NULL) {
+        if(argc > 1) {
+            int tmp;
+            if(strcmp(argv[1],"-p") == 0) {
+                tmp = 0;
+            }
+            if(strcmp(argv[1],"-u") == 0) {
+                tmp = 1;
+            }
+            if(strcmp(argv[1],"-l") == 0) {
+                tmp = 2;
+            }
+            switch(tmp) {
+                case 1:Toupper(s);break;
+                case 2:Tolower(s);break;
+                default:0;break;
+            }
+        }
     }
 
-    return 0;
+    printf("%s",s);
+    fclose(fp);
+    
+    return EXIT_SUCCESS;
 }
 
-void Callback(int (*pFun)(int,int)) {
-    int x = 0;
-    int y = 0;
-    int ret = 0;
-    scanf("%d %d",&x,&y);
-    ret = pFun(x,y);
-    printf("%d",ret);
-    return;
+void Toupper(char* s) {
+    int len = strlen(s);
+    int i;
+    for(i = 0; i < len; i++) {
+        if(s[i] >= 97 && s[i] <= 97+26) {
+            s[i] -= 32;
+        }
+    }
 }
 
-int add(int a,int b) {
-    return a + b;
-}
 
-int mutiply(int a,int b) {
-    return a * b;
+void Tolower(char* s) {
+    int len = strlen(s);
+    int i;
+    for(i = 0; i < len; i++) {
+        if(s[i] >= 65 && s[i] <= 65+26) {
+            s[i] += 32;
+        }
+    }
 }

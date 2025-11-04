@@ -1,3 +1,5 @@
+// 3
+
 #include<stdio.h>
 #define SIZE 10
 

@@ -1,3 +1,5 @@
+// 10
+
 #include<stdio.h>
 #include<stdlib.h>
 
@@ -15,6 +17,7 @@ int main() {
         printf("%d\t",ar3[i]);
     }
     free(ar3);
+    ar3 = NULL;
 
     return 0;
 }

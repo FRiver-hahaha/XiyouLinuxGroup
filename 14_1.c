@@ -1,3 +1,5 @@
+// 10
+
 #include<stdio.h>
 #include<stdlib.h>
 
@@ -14,6 +16,7 @@ int main() {
     ar2 = transform(ar1, ar2, len, rev);
     ar2 = transform(ar1, ar2, len, sqrt);
     free(ar2);
+    ar2 = NULL;
     return 0;
 }
 

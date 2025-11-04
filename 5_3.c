@@ -1,3 +1,5 @@
+// 7
+
 #include<stdio.h>
 
 double plus(double x);

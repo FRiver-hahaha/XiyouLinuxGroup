@@ -1,3 +1,5 @@
+// 6
+
 #include<stdio.h>
 #include<string.h>
 

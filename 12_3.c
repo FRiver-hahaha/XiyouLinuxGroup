@@ -1,3 +1,5 @@
+// 1
+
 #include<stdio.h>
 
 void critic(int* a);

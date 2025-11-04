@@ -1,3 +1,5 @@
+// 1
+
 #include<stdio.h>
 
 double min(double x,double y);

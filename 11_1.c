@@ -1,3 +1,5 @@
+// 9
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -14,6 +16,7 @@ int main() {
     }
     printf("%s",s1);
     free(s1);
+    s1 = NULL;
 
     return 0;
 }

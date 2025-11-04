@@ -1,3 +1,5 @@
+// 13
+
 #include<stdio.h>
 
 int pow1(int a,int b);
