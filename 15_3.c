@@ -1,7 +1,7 @@
 // 5
-
 #include<stdio.h>
 #include<limits.h>
+#pragma once
 
 void bitS(char*,int);
 void bitChange(char*,int);
