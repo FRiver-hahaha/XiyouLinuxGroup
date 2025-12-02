@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
     //读写文件
 
     while((numRead = read(inputfd, buf, BUF_SIZE)) > 0) {
-        if(write(outputfd,buf,numRead) != numRead) {
+        if((outputfd,buf,numRead) != numRead) {
             fatal("could't write whole buffer.");
         }
     }
