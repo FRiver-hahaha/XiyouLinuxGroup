@@ -11,28 +11,28 @@
 #include <time.h>
 #include <inttypes.h>
 
-// 掩码确定参数
-#define Ca              1
-#define Cl              10
-#define CR              100
-#define Ct              1000
-#define Cr              10000
-#define Ci              100000
-#define Cs              1000000
+// 掩码确定参数 
+#define Ca              1               // 显示隐藏文件排列
+#define Cl              10              // 详细排列
+#define CR              100             // 递归排列    
+#define Ct              1000            // 按照最新一次修改时间降序排列
+#define Cr              10000           // 逆序排列
+#define Ci              100000          // 显示inode编号排列
+#define Cs              1000000         // 显示已用内存块数量排列
 
 // 确定颜色
 #define COLOR_RESET      "\033[0m"
-#define COLOR_DIR       "\033[1;34m"  // 粗体蓝色
-#define COLOR_EXE       "\033[1;32m"  // 粗体绿色
-#define COLOR_LINK      "\033[1;36m"  // 粗体青色
-#define COLOR_SOCKET    "\033[1;35m"  // 粗体紫色（socket）
-#define COLOR_PIPE      "\033[33m"    // 黄色（管道）
-#define COLOR_BLOCK     "\033[1;33m"  // 粗体黄色（块设备：u盘，固态)
-#define COLOR_CHAR      "\033[1;33m"  // 粗体黄色（字符设备:键鼠）
+#define COLOR_DIR       "\033[1;34m"    // 粗体蓝色
+#define COLOR_EXE       "\033[1;32m"    // 粗体绿色
+#define COLOR_LINK      "\033[1;36m"    // 粗体青色
+#define COLOR_SOCKET    "\033[1;35m"    // 粗体紫色（socket）
+#define COLOR_PIPE      "\033[33m"      // 黄色（管道）
+#define COLOR_BLOCK     "\033[1;33m"    // 粗体黄色（块设备：u盘，固态)
+#define COLOR_CHAR      "\033[1;33m"    // 粗体黄色（字符设备:键鼠）
 
-int isfastoutput(int);//命令行中传入的参数是否只有该可知性文件
+int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
 char whatCommad(int, char*[]);//确定参数
-void listFiles(const char*, int);//列出目录下的文件
+void listFiles(const char*, int);//根据参数，列出目录下的文件
 
 int main(int argc, char* argv[]) {
     
@@ -67,8 +67,8 @@ void listFiles(const char* dirpath, int command) {
                 break;
             }
             
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp->d_name);
-            lstat(fullpath, &st);
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            lstat(fullpath, &st);//获取文件详细信息
             
 
             if(S_ISDIR(st.st_mode)) {
