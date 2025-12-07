@@ -1,8 +1,9 @@
-//12.7该处理参数，并且弄懂读取目录的函数
+//12.7下一步该处理i,s参数，目前问题：加上参数不显示
 
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
@@ -32,7 +33,10 @@
 
 int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
 char whatCommad(int, char*[]);//确定参数
-void listFiles(const char*, int);//根据参数，列出目录下的文件
+void listFiles(const char*, int);//根据参数，普通列出目录下的文件
+void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
+int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
+
 
 int main(int argc, char* argv[]) {
     
@@ -46,6 +50,8 @@ int main(int argc, char* argv[]) {
     exit(EXIT_SUCCESS);
 }
 
+
+
 int isfastoutput(int argc) {
     if(argc == 1) {
         return 1;
@@ -54,72 +60,53 @@ int isfastoutput(int argc) {
 }
 
 void listFiles(const char* dirpath, int command) {
-    
-    DIR* dir = opendir(dirpath);
-    struct dirent* dp;
+    int n;
+    struct dirent** dp;
     struct stat st;
     char fullpath[1024];
 
-    if(!command) {
-        while(1) {
-            dp = readdir(dir);
-            if(!dp) {
-                break;
-            }
+    if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
+        n = scandir(dirpath, &dp, NULL, CompareList);
+        for(int i = 0; i < n; i++) {
             
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
-            
 
             if(S_ISDIR(st.st_mode)) {
-                printf(COLOR_DIR "%s" COLOR_RESET "\t", dp->d_name);
-            } else if(S_ISLNK(st.st_mode)) {
-                printf(COLOR_LINK "%s" COLOR_RESET "\t", dp->d_name);
-            } else if(S_ISSOCK(st.st_mode)) {
-                printf(COLOR_SOCKET "%s" COLOR_RESET "\t", dp->d_name);
-            } else if(S_ISFIFO(st.st_mode)) {
-                printf(COLOR_PIPE "%s" COLOR_RESET "\t", dp->d_name);
-            } else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
-                printf(COLOR_BLOCK "%s" COLOR_RESET "\t", dp->d_name);
-            } else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
+                if(command & Ci) 
+                    printf("%-7lu ",st.st_ino);
+                if(command & Cs) 
+                    printf("%-7ld",st.st_blocks);
+                printf(COLOR_DIR "%s" COLOR_RESET "\t", dp[i]->d_name);
+            } else if(command & Ca && S_ISLNK(st.st_mode)) {
+                printf(COLOR_LINK "%s" COLOR_RESET "\t", dp[i]->d_name);
+            } else if(command & Ca && S_ISSOCK(st.st_mode)) {
+                printf(COLOR_SOCKET "%s" COLOR_RESET "\t", dp[i]->d_name);
+            } else if(command & Ca && S_ISFIFO(st.st_mode)) {
+                printf(COLOR_PIPE "%s" COLOR_RESET "\t", dp[i]->d_name);
+            } else if(command & Ca && S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
+                printf(COLOR_BLOCK "%s" COLOR_RESET "\t", dp[i]->d_name);
+            } else if(command & Ca && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
                 // 可执行文件
-                printf(COLOR_EXE "%s" COLOR_RESET "\t", dp->d_name);
+                printf(COLOR_EXE "%s" COLOR_RESET "\t", dp[i]->d_name);
             } else {
                 // 普通文件
-                printf("%s\t", dp->d_name);
+                printf("%s\t", dp[i]->d_name);
             }
+
+            
         }
+
+        for(int i = 0; i < n; i++) {
+            free(dp[i]);
+        }
+        free(dp);
     }
-
-    while(1) {
-
-        dp = readdir(dir);
-        if(!dp) {
-            break;
-        }
-        
-        snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp->d_name);
-        lstat(fullpath, &st);
-        
-
-        if(S_ISDIR(st.st_mode)) {
-            printf("%ju "COLOR_DIR "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else if(S_ISLNK(st.st_mode)) {
-            printf("%ju "COLOR_LINK "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else if(S_ISSOCK(st.st_mode)) {
-            printf("%ju "COLOR_SOCKET "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else if(S_ISFIFO(st.st_mode)) {
-            printf("%ju "COLOR_PIPE "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
-            printf("%ju "COLOR_BLOCK "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
-            // 可执行文件
-            printf("%ju "COLOR_EXE "%s" COLOR_RESET "\t", dp->d_ino, dp->d_name);
-        } else {
-            // 普通文件
-            printf("%ju ""%s\t",dp->d_ino , dp->d_name);
-        }
+    else if(command & Cl) {
     }
+    
+    
 
 }
 
@@ -154,10 +141,21 @@ char whatCommad(int argc, char* argv[]) {
                         command |= Cs;
                         break;
                     default:
-                        print("Wrong Argument");
+                        printf("Wrong Argument");
                         break;
                 }
             }
         }
     }
+}
+
+void LongList(const char* dirpath, struct dirent** list, int n, int command) {
+    char fullbuffer[1024];
+    char tmbuffer[80];
+    struct tm* tm;
+    struct stat st;
+}
+
+int CompareList(const struct dirent** a, const struct dirent** b) {
+    return strcmp((*a)->d_name, (*b)->d_name);
 }

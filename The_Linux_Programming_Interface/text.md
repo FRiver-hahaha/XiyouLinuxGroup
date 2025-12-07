@@ -8,7 +8,7 @@
 ## creat(pathname, mode)
 - 定义：(早期unix系统下的open函数没有创建一个文件的功能)创建并打开一个新文件
 
-- 位置：#include<fcntl.h>
+- 位置：#include <fcntl.h>
 
 - 参数：
 1. pathname:目标创建或目标打开的文件名
@@ -19,7 +19,7 @@
 ## open(pathname, flags, mode)
 - 定义：打开一个业已存在的文件，也能创建并打开一个新文件
 
-- 位置：#include<fcntl.h>  
+- 位置：#include <fcntl.h>  
   
 - 参数：  
 1. pathname:文件名
@@ -31,7 +31,7 @@
 ## read(fd,buffer,count)
 - 定义：从文件标识符fd所指代的打开文件中读取数据
 
-- 位置：#include<unistd.h>
+- 位置：#include <unistd.h>
 
 - 参数：
 1. fd:目标读取文件的文件标识符
@@ -55,13 +55,13 @@
 ## close(fd)
 - 定义：关闭一个已打开的文件描述符所指代的文件，并将其释放回调用进程，供该进程继续使用
 
-- 位置：#include<unistd.h>
+- 位置：#include <unistd.h>
 
 - 参数：fd：一个文件描述符
 
 - 返回值：一个文件描述符、-1(报错)
 
-##lseek(fd, offset, whence)
+## lseek(fd, offset, whence)
 - 定义：文件打开时，将文件偏移量设置为指向文件开始，指执行下一个read()或write()操作的文件起始位置
 
 - 参数：  
@@ -79,4 +79,45 @@
 2. 快速创建大文件。
 3. 减少io操作。
 
-## 
+## opendir(dirpath)
+- 定义：打开一个目录
+
+- 位置：#include <dirent.h>
+
+- 参数：dirpath:目标打开目录
+
+- 返回值：指向DIR结构的指针
+
+## readdir(dirp)
+- 定义：从DIR所指代的目录中读取下一个目录条目(文件)
+
+- 位置：#include <dirent.h>
+
+- 参数：dirp:DIR结构的目录
+
+- 返回值：指向dirent结构的指针
+
+## snprintf(buffer,size,format,...)
+- 定义：安全地格式化输出到字符串缓冲区
+
+- 位置：#include <stdio.h>
+
+- 参数：
+1. buffer:目标缓冲区
+2. 缓冲区大小
+3. 目标字符串
+4. 配置字符串的参数
+
+- 返回值：想要输出的字符数(不包括'\0'，即使溢出，返回值也不变)
+
+## lstat(pathname,statbuf)
+- 定义：获取文件信息
+
+- 位置：#include <sys/stat.h>
+
+- 参数：
+1. pathname:目标路径
+2. statbuf:指向stat结构的指针
+
+- 返回值：0、-1
+
