@@ -17,3 +17,8 @@ new_row = pd.DataFrame([{"Name": "Sandy", "Age": 18, "Job": "Engineer"},
 df = pd.concat([df, new_row])
 
 print(df)
+
+# 数据清洗
+
+df
+
