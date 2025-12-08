@@ -1,4 +1,4 @@
-//12.7下一步该处理i,s参数，目前问题：加上参数不显示
+//12.8 下一步:继续处理参数
 
 #include <dirent.h>
 #include <stdio.h>
@@ -13,13 +13,13 @@
 #include <inttypes.h>
 
 // 掩码确定参数 
-#define Ca              1               // 显示隐藏文件排列
-#define Cl              10              // 详细排列
-#define CR              100             // 递归排列    
-#define Ct              1000            // 按照最新一次修改时间降序排列
-#define Cr              10000           // 逆序排列
-#define Ci              100000          // 显示inode编号排列
-#define Cs              1000000         // 显示已用内存块数量排列
+#define Ca              0b1               // 显示隐藏文件排列
+#define Cl              0b10              // 详细排列
+#define CR              0b100             // 递归排列    
+#define Ct              0b1000            // 按照最新一次修改时间降序排列
+#define Cr              0b10000           // 逆序排列
+#define Ci              0b100000          // 显示inode编号排列
+#define Cs              0b1000000         // 显示已用内存块数量排列
 
 // 确定颜色
 #define COLOR_RESET      "\033[0m"
@@ -31,13 +31,14 @@
 #define COLOR_BLOCK     "\033[1;33m"    // 粗体黄色（块设备：u盘，固态)
 #define COLOR_CHAR      "\033[1;33m"    // 粗体黄色（字符设备:键鼠）
 
-int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
-int whatCommad(int, char*[]);//确定参数
 void listFiles(const char*, int, int);//根据参数，普通列出目录下的文件
 void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
-int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
 void printWithis(int, struct stat*);//显示
+int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
+int whatCommand(int, char*[]);//确定参数
+int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
 int HowManyDirpath(int, char*[]);//确定目标路径的数量
+int shouldPrintA(int, struct dirent*);//是否需要打印隐藏文件
 
 
 int main(int argc, char* argv[]) {
@@ -45,14 +46,16 @@ int main(int argc, char* argv[]) {
     if(isfastoutput(argc)) {
         listFiles(".", 0, tmpargc);
     }else {
-        int command = whatCommad(argc, argv);
-        listFiles(*(argv++ + 1), command, tmpargc);
+        int command = whatCommand(argc, argv);
+        for(int i = 1; i < argc; i++) {
+            listFiles(argv[i], command, tmpargc);
+            if(!(i == argc - 1) )printf("\n");
+        }
     }
     printf("\n");
+
     exit(EXIT_SUCCESS);
 }
-
-
 
 int isfastoutput(int argc) {
     if(argc == 1) {
@@ -62,6 +65,12 @@ int isfastoutput(int argc) {
 }
 
 void listFiles(const char* dirpath, int command, int tmpargc) {
+
+    if(access(dirpath, F_OK) != 0) {
+        fprintf(stderr, "无法访问 '%s': 没有那个文件或目录\n", dirpath);
+        return;
+    }
+
     int n;
     struct dirent** dp;
     struct stat st;
@@ -69,33 +78,39 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
 
     if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
         n = scandir(dirpath, &dp, NULL, CompareList);
+        if(n < 0) {
+            perror("scandir");
+            return;
+        }
+
         if(tmpargc > 1) 
             printf("%s:\n",dirpath);
         for(int i = 0; i < n; i++) {
-            
-            
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
+
+            if(!shouldPrintA(command, dp[i])) continue;
 
             char* color = COLOR_RESET;
             char* reset = COLOR_RESET;
 
             printWithis(command, &st);
 
-            if(S_ISDIR(st.st_mode))
+            if(S_ISDIR(st.st_mode)) 
                 color = COLOR_DIR;
-            else if(command & Ca && S_ISLNK(st.st_mode)) 
+            else if(S_ISLNK(st.st_mode)) 
                 color = COLOR_LINK;
-            else if(command & Ca && S_ISSOCK(st.st_mode)) 
+            else if(S_ISSOCK(st.st_mode)) 
                 color = COLOR_SOCKET;
-            else if(command & Ca && S_ISFIFO(st.st_mode)) 
+            else if(S_ISFIFO(st.st_mode)) 
                 color = COLOR_PIPE;
-            else if(command & Ca && (S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode))) 
+            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
                 color = COLOR_BLOCK;
-            else if(command & Ca && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
-                color = COLOR_EXE;
-            
+            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
+                color = COLOR_EXE; 
+
             printf("%s%s%s\t", color, dp[i]->d_name, reset);
+            
         }
 
         for(int i = 0; i < n; i++) {
@@ -105,18 +120,18 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     }
 }
 
-int whatCommad(int argc, char* argv[]) {
+int whatCommand(int argc, char* argv[]) {
     int command = 0;
     if(argc == 1) {
         return 0;
     }
-    for(int i = 2; i < argc; ++i) {
+    for(int i = 1; i < argc; ++i) {
         if(argv[i][0] != '-') {
             continue;
         }else {
             int j = 1;
-            while(argv[i][j++] != '\0') {
-                switch (argv[i][j]) {
+            while(argv[i][j] != '\0') {
+                switch (argv[i][j++]) {
                     case 'a':
                         command |= Ca;
                         break;
@@ -139,8 +154,8 @@ int whatCommad(int argc, char* argv[]) {
                         command |= Cs;
                         break;
                     default:
-                        printf("Wrong Argument");
-                        break;
+                        fprintf(stderr, "可用选项：-a, -l, -R, -t, -r, -i, -s\n");
+                       exit(EXIT_FAILURE);
                 }
             }
         }
@@ -175,4 +190,11 @@ int HowManyDirpath(int argc, char* argv[]) {
     }
     
     return cnt;
+}
+
+int shouldPrintA(int command, struct dirent* dp) {
+    if(dp->d_name[0] == '.') {
+        return (command & Ca);
+    }
+    return 1;
 }

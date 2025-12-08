@@ -119,5 +119,15 @@
 1. pathname:目标路径
 2. statbuf:指向stat结构的指针
 
-- 返回值：0、-1
+- 返回值：0、-1(报错)
 
+## access(pathname,mode)
+- 定义：检查对文件的访问权限
+
+- 位置：#include <unistd.h>
+
+- 参数：
+1. pathname:目标文件
+2. 权限参数
+
+- 返回值：0、-1(报错)
