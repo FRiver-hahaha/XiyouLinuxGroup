@@ -33,19 +33,20 @@
 
 int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
 int whatCommad(int, char*[]);//确定参数
-void listFiles(const char*, int);//根据参数，普通列出目录下的文件
+void listFiles(const char*, int, int);//根据参数，普通列出目录下的文件
 void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
 int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
-void printWithiORS(int, struct stat*);
+void printWithis(int, struct stat*);//显示
+int HowManyDirpath(int, char*[]);//确定目标路径的数量
 
 
 int main(int argc, char* argv[]) {
-    
+    int tmpargc = HowManyDirpath(argc, argv);
     if(isfastoutput(argc)) {
-        listFiles(".", 0);
+        listFiles(".", 0, tmpargc);
     }else {
         int command = whatCommad(argc, argv);
-        listFiles(*(argv++ + 1), command);
+        listFiles(*(argv++ + 1), command, tmpargc);
     }
     printf("\n");
     exit(EXIT_SUCCESS);
@@ -60,7 +61,7 @@ int isfastoutput(int argc) {
     return 0;
 }
 
-void listFiles(const char* dirpath, int command) {
+void listFiles(const char* dirpath, int command, int tmpargc) {
     int n;
     struct dirent** dp;
     struct stat st;
@@ -68,6 +69,8 @@ void listFiles(const char* dirpath, int command) {
 
     if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
         n = scandir(dirpath, &dp, NULL, CompareList);
+        if(tmpargc > 1) 
+            printf("%s:\n",dirpath);
         for(int i = 0; i < n; i++) {
             
             
@@ -77,8 +80,8 @@ void listFiles(const char* dirpath, int command) {
             char* color = COLOR_RESET;
             char* reset = COLOR_RESET;
 
-            printWithiORS(command, &st);
-            
+            printWithis(command, &st);
+
             if(S_ISDIR(st.st_mode))
                 color = COLOR_DIR;
             else if(command & Ca && S_ISLNK(st.st_mode)) 
@@ -87,7 +90,7 @@ void listFiles(const char* dirpath, int command) {
                 color = COLOR_SOCKET;
             else if(command & Ca && S_ISFIFO(st.st_mode)) 
                 color = COLOR_PIPE;
-            else if(command & Ca && S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
+            else if(command & Ca && (S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode))) 
                 color = COLOR_BLOCK;
             else if(command & Ca && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
                 color = COLOR_EXE;
@@ -156,9 +159,20 @@ int CompareList(const struct dirent** a, const struct dirent** b) {
     return strcmp((*a)->d_name, (*b)->d_name);
 }
 
-void printWithiORS(int command, struct stat* st) {
+void printWithis(int command, struct stat* st) {
     if(command & Ci) 
         printf("%-7lu ",st->st_ino);
     if(command & Cs) 
         printf("%-7ld ",st->st_blocks);
+}
+
+int HowManyDirpath(int argc, char* argv[]) {
+    int cnt = 0;
+    for(int i = 1; i < argc; i++) {
+        if(argv[i][0] != '-') {
+            cnt++;
+        }
+    }
+    
+    return cnt;
 }
