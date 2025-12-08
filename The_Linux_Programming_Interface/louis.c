@@ -32,10 +32,11 @@
 #define COLOR_CHAR      "\033[1;33m"    // 粗体黄色（字符设备:键鼠）
 
 int isfastoutput(int);//命令行中传入的参数是否只有该可执行文件
-char whatCommad(int, char*[]);//确定参数
+int whatCommad(int, char*[]);//确定参数
 void listFiles(const char*, int);//根据参数，普通列出目录下的文件
 void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
 int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
+void printWithiORS(int, struct stat*);
 
 
 int main(int argc, char* argv[]) {
@@ -73,29 +74,25 @@ void listFiles(const char* dirpath, int command) {
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
 
-            if(S_ISDIR(st.st_mode)) {
-                if(command & Ci) 
-                    printf("%-7lu ",st.st_ino);
-                if(command & Cs) 
-                    printf("%-7ld",st.st_blocks);
-                printf(COLOR_DIR "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else if(command & Ca && S_ISLNK(st.st_mode)) {
-                printf(COLOR_LINK "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else if(command & Ca && S_ISSOCK(st.st_mode)) {
-                printf(COLOR_SOCKET "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else if(command & Ca && S_ISFIFO(st.st_mode)) {
-                printf(COLOR_PIPE "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else if(command & Ca && S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) {
-                printf(COLOR_BLOCK "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else if(command & Ca && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
-                // 可执行文件
-                printf(COLOR_EXE "%s" COLOR_RESET "\t", dp[i]->d_name);
-            } else {
-                // 普通文件
-                printf("%s\t", dp[i]->d_name);
-            }
+            char* color = COLOR_RESET;
+            char* reset = COLOR_RESET;
 
+            printWithiORS(command, &st);
             
+            if(S_ISDIR(st.st_mode))
+                color = COLOR_DIR;
+            else if(command & Ca && S_ISLNK(st.st_mode)) 
+                color = COLOR_LINK;
+            else if(command & Ca && S_ISSOCK(st.st_mode)) 
+                color = COLOR_SOCKET;
+            else if(command & Ca && S_ISFIFO(st.st_mode)) 
+                color = COLOR_PIPE;
+            else if(command & Ca && S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
+                color = COLOR_BLOCK;
+            else if(command & Ca && st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
+                color = COLOR_EXE;
+            
+            printf("%s%s%s\t", color, dp[i]->d_name, reset);
         }
 
         for(int i = 0; i < n; i++) {
@@ -103,15 +100,13 @@ void listFiles(const char* dirpath, int command) {
         }
         free(dp);
     }
-    else if(command & Cl) {
-    }
-    
-    
-
 }
 
-char whatCommad(int argc, char* argv[]) {
+int whatCommad(int argc, char* argv[]) {
     int command = 0;
+    if(argc == 1) {
+        return 0;
+    }
     for(int i = 2; i < argc; ++i) {
         if(argv[i][0] != '-') {
             continue;
@@ -147,6 +142,7 @@ char whatCommad(int argc, char* argv[]) {
             }
         }
     }
+    return command;
 }
 
 void LongList(const char* dirpath, struct dirent** list, int n, int command) {
@@ -158,4 +154,11 @@ void LongList(const char* dirpath, struct dirent** list, int n, int command) {
 
 int CompareList(const struct dirent** a, const struct dirent** b) {
     return strcmp((*a)->d_name, (*b)->d_name);
+}
+
+void printWithiORS(int command, struct stat* st) {
+    if(command & Ci) 
+        printf("%-7lu ",st->st_ino);
+    if(command & Cs) 
+        printf("%-7ld ",st->st_blocks);
 }
