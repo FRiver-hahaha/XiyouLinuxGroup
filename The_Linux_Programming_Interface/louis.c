@@ -234,9 +234,9 @@ int CompareListNormal(const struct dirent** a, const struct dirent** b) {
 
 void printWithis(int command, struct stat* st) {
     if(command & Ci) 
-        printf("%-2lu ",st->st_ino);
+        printf("%2lu ",st->st_ino);
     if(command & Cs) 
-        printf("%-2ld ",st->st_blocks);
+        printf("%2ld ",st->st_blocks);
 }
 
 int HowManyDirpath(int argc, char* argv[]) {
