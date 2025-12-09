@@ -1,4 +1,4 @@
-//12.8 当前问题:界面美观化处理
+//12.8 当前问题:界面美观化处理，内存块2倍
 
 #include <dirent.h>
 #include <stdio.h>
@@ -16,8 +16,8 @@
 #define Ca              0b1               // 显示隐藏文件排列1
 #define Cl              0b10              // 详细排列
 #define CR              0b100             // 递归排列    
-#define Ct              0b1000            // 按照最新一次修改时间降序排列
-#define Cr              0b10000           // 逆序排列
+#define Ct              0b1000            // 按照最新一次修改时间降序排列1
+#define Cr              0b10000           // 逆序排列1
 #define Ci              0b100000          // 显示inode编号排列1
 #define Cs              0b1000000         // 显示已用内存块数量排列1
 
@@ -61,7 +61,8 @@ int main(int argc, char* argv[]) {
 int CompareListTime(const struct dirent** a, const struct dirent** b) {
     struct stat sta, stb;
     lstat((*a)->d_name, &sta);lstat((*b)->d_name, &stb);
-    return sta.st_atime >= stb.st_atime ? -1 : 1;
+    if(sta.st_atime != stb.st_atime) return sta.st_atime > stb.st_atime ? -1 : 1;
+    return strcmp((*a)->d_name, (*b)->d_name);
 }
 
 int isfastoutput(int argc, char* argv[]) {
