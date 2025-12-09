@@ -1,4 +1,4 @@
-//12.8 当前问题，只给参数不通过，界面美观化处理
+//12.8 当前问题:界面美观化处理
 
 #include <dirent.h>
 #include <stdio.h>
@@ -13,13 +13,13 @@
 #include <inttypes.h>
 
 // 掩码确定参数 
-#define Ca              0b1               // 显示隐藏文件排列
+#define Ca              0b1               // 显示隐藏文件排列1
 #define Cl              0b10              // 详细排列
 #define CR              0b100             // 递归排列    
 #define Ct              0b1000            // 按照最新一次修改时间降序排列
 #define Cr              0b10000           // 逆序排列
-#define Ci              0b100000          // 显示inode编号排列
-#define Cs              0b1000000         // 显示已用内存块数量排列
+#define Ci              0b100000          // 显示inode编号排列1
+#define Cs              0b1000000         // 显示已用内存块数量排列1
 
 // 确定颜色
 #define COLOR_RESET      "\033[0m"
@@ -36,7 +36,8 @@ void LongList(const char*, struct dirent**, int, int);//详细列出目录下的
 void printWithis(int, struct stat*);//显示
 int isfastoutput(int, char*[]);//命令行中传入的参数是否只有该可执行文件
 int whatCommand(int, char*[]);//确定参数
-int CompareList(const struct dirent** a, const struct dirent** b);//按照字符顺序排列
+int CompareListNormal(const struct dirent**, const struct dirent**);//按照字符顺序排列
+int CompareListTime(const struct dirent**, const struct dirent**);//按照最新一次修改时间排列
 int HowManyDirpath(int, char*[]);//确定目标路径的数量
 int shouldPrintA(int, struct dirent*);//是否需要打印隐藏文件
 
@@ -46,20 +47,25 @@ int main(int argc, char* argv[]) {
     if(isfastoutput(argc,argv)) {
         int command = whatCommand(argc, argv);
         listFiles(".", command, tmpargc);
+        printf("\n");
     }else {
         int command = whatCommand(argc, argv);
         for(int i = 1; i < argc; i++) {
             listFiles(argv[i], command, tmpargc);
-            if(!(i == argc - 1) && argv[i][0] != '-')printf("\n");
+            if(argv[i][0] != '-')printf("\n");
         }
     }
-    printf("\n");
-
     exit(EXIT_SUCCESS);
 }
 
+int CompareListTime(const struct dirent** a, const struct dirent** b) {
+    struct stat sta, stb;
+    lstat((*a)->d_name, &sta);lstat((*b)->d_name, &stb);
+    return sta.st_atime >= stb.st_atime ? -1 : 1;
+}
+
 int isfastoutput(int argc, char* argv[]) {
-    if(argc == 1 || argc == 2 || argv[1][0] == '-') {
+    if(argc == 1 || (argc == 2 && argv[1][0] == '-')) {
         return 1;
     }
     return 0;
@@ -82,7 +88,10 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     char fullpath[1024];
 
     if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
-        n = scandir(dirpath, &dp, NULL, CompareList);
+        if(command & Ct) 
+            n = scandir(dirpath, &dp, NULL, CompareListTime);
+        else 
+            n = scandir(dirpath, &dp, NULL, CompareListNormal);
         if(n < 0 && dirpath[0]) {
             perror("scandir");
             return;
@@ -90,33 +99,76 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
 
         if(tmpargc > 1) 
             printf("%s:\n",dirpath);
-        for(int i = 0; i < n; i++) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
-            lstat(fullpath, &st);//获取文件详细信息
 
-            if(!shouldPrintA(command, dp[i])) continue;
-
-            char* color = COLOR_RESET;
-            char* reset = COLOR_RESET;
-
-            printWithis(command, &st);
-
-            if(S_ISDIR(st.st_mode)) 
-                color = COLOR_DIR;
-            else if(S_ISLNK(st.st_mode)) 
-                color = COLOR_LINK;
-            else if(S_ISSOCK(st.st_mode)) 
-                color = COLOR_SOCKET;
-            else if(S_ISFIFO(st.st_mode)) 
-                color = COLOR_PIPE;
-            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
-                color = COLOR_BLOCK;
-            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
-                color = COLOR_EXE;
-
-            printf("%s%s%s\t", color, dp[i]->d_name, reset);
-            
+        if(command & Cs) {
+            long long sum = 0;
+            for(int i = 0; i < n; ++i) {
+                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+                lstat(fullpath, &st);
+                if(!shouldPrintA(command, dp[i])) continue;
+                sum += st.st_blocks;
+            }
+            printf("总计 %lld\n",sum);
         }
+        if((command & Cr) == 0) {
+            for(int i = 0;i < n; i++) {
+                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+                lstat(fullpath, &st);//获取文件详细信息
+
+                if(!shouldPrintA(command, dp[i])) continue;
+
+                char* color = COLOR_RESET;
+                char* reset = COLOR_RESET;
+
+                printWithis(command, &st);
+
+                if(S_ISDIR(st.st_mode)) 
+                    color = COLOR_DIR;
+                else if(S_ISLNK(st.st_mode)) 
+                    color = COLOR_LINK;
+                else if(S_ISSOCK(st.st_mode)) 
+                    color = COLOR_SOCKET;
+                else if(S_ISFIFO(st.st_mode)) 
+                    color = COLOR_PIPE;
+                else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
+                    color = COLOR_BLOCK;
+                else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
+                    color = COLOR_EXE;
+
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                
+            }
+        }
+        else {
+            for(int i = n - 1; i >= 0; --i) {
+                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+                lstat(fullpath, &st);//获取文件详细信息
+
+                if(!shouldPrintA(command, dp[i])) continue;
+
+                char* color = COLOR_RESET;
+                char* reset = COLOR_RESET;
+
+                printWithis(command, &st);
+
+                if(S_ISDIR(st.st_mode)) 
+                    color = COLOR_DIR;
+                else if(S_ISLNK(st.st_mode)) 
+                    color = COLOR_LINK;
+                else if(S_ISSOCK(st.st_mode)) 
+                    color = COLOR_SOCKET;
+                else if(S_ISFIFO(st.st_mode)) 
+                    color = COLOR_PIPE;
+                else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) 
+                    color = COLOR_BLOCK;
+                else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) 
+                    color = COLOR_EXE;
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                
+            }
+        }
+        
+        
 
         for(int i = 0; i < n; i++) {
             free(dp[i]);
@@ -175,7 +227,7 @@ void LongList(const char* dirpath, struct dirent** list, int n, int command) {
     struct stat st;
 }
 
-int CompareList(const struct dirent** a, const struct dirent** b) {
+int CompareListNormal(const struct dirent** a, const struct dirent** b) {
     return strcmp((*a)->d_name, (*b)->d_name);
 }
 
