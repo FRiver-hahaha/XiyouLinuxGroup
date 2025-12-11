@@ -1,4 +1,4 @@
-//12.8 当前问题:界面美观化处理
+//12.8 当前问题:界面美观化处理的空格和换行
 
 #include <dirent.h>
 #include <stdio.h>
@@ -34,7 +34,7 @@
 
 void listFiles(const char*, int, int);//根据参数，普通列出目录下的文件
 void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
-void printWithis(int, struct stat*, struct dirent*, int, int);//显示
+void printWithis(int, struct stat*, int, struct dirent**);//显示
 int isfastoutput(int, char*[]);//命令行中传入的参数是否只有该可执行文件
 int whatCommand(int, char*[]);//确定参数
 int CompareListNormal(const struct dirent**, const struct dirent**);//按照字符顺序排列
@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
         int command = whatCommand(argc, argv);
         for(int i = 1; i < argc; i++) {
             listFiles(argv[i], command, tmpargc);
+            printf("\n");
         }
     }
     exit(EXIT_SUCCESS);
@@ -111,19 +112,26 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
             term_width = w.ws_col;
         int maxLength = maxFileLength(command, dp, n, 0);
-        int Time = term_width / maxLength;
+        int Time = term_width / (maxLength + 4);
         Time = Time <= 0 ? 1 : Time;
-        int j = 0;
+        printf("我在%d\n\n\n",Time);
+        int j = 1;
         for(int i = 0; i < n && !(command & Cr); i++) {
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
-
+            
+            
             if(!shouldPrintA(command, dp[i])) continue;
+
+            if(j > Time) {
+                printf("\n");
+            }
+
 
             char* color = COLOR_RESET;
             char* reset = COLOR_RESET;
 
-            printWithis(command, &st, dp[i], n, res);
+            printWithis(command, &st, n, dp);
 
             if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
             else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
@@ -131,21 +139,21 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
             else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
             else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
-            if(j++ <= Time) {
-                printf("%s%s%s", color, dp[i]->d_name, reset);
-                for(int i = 0; i < maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name); i++) {
+            if(j <= Time) {
+                j++;
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                int length = maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name);
+                for(int i = 0; i < length && length >= 3; ++i) {
                     printf(" ");
                 }
-                printf("  ");
             }
             else {
-                printf("\n");
-                printf("%s%s%s", color, dp[i]->d_name, reset);
-                for(int i = 0; i < maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name); i++) {
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                int length = maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name);
+                for(int i = 0; i < length && length >= 3; ++i) {
                     printf(" ");
                 }
-                printf("  ");
-                j = 0;
+                j = 1;
             }
         }
         for(int i = n - 1; i >= 0 && command & Cr; --i) {
@@ -154,28 +162,33 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             if(!shouldPrintA(command, dp[i])) continue;
             char* color = COLOR_RESET;
             char* reset = COLOR_RESET;
-            printWithis(command, &st, dp[i], n, res);
+            printWithis(command, &st, n, dp);
+
+            if(j > Time) {
+                printf("\n");
+            }
+            
             if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
             else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
             else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
             else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
             else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
             else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
-            if(j++ <= Time) {
-                printf("%s%s%s", color, dp[i]->d_name, reset);
-                for(int i = 0; i < maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name); i++) {
+            if(j <= Time) {
+                j++;
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                int length = maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name);
+                for(int i = 0; i < length && length >= 3; ++i) {
                     printf(" ");
                 }
-                printf("  ");
             }
             else {
-                printf("\n");
-                printf("%s%s%s", color, dp[i]->d_name, reset);
-                for(int i = 0; i < maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name); i++) {
+                printf("%s%s%s  ", color, dp[i]->d_name, reset);
+                int length = maxFileLength(command, dp, n, 3) - (int)strlen(dp[i]->d_name);
+                for(int i = 0; i < length && length >= 3; ++i) {
                     printf(" ");
                 }
-                printf("  ");
-                j = 0;
+                j = 1;
             }
         }
         for(int i = 0; i < n; i++) free(dp[i]);
@@ -236,27 +249,34 @@ int CompareListNormal(const struct dirent** a, const struct dirent** b) {
     return strcmp((*a)->d_name, (*b)->d_name);
 }
 
-void printWithis(int command, struct stat* st, struct dirent* dp, int n, int res) {
+void printWithis(int command, struct stat* st, int n, struct dirent** dpall) {
     if(command & Ci) {
         int mask = 1;
-        int tmp = st->st_ino;
-        while(tmp > 9) {
+        long int tmp = st->st_ino;
+        do {
             tmp /= 10;
-            mask *= 10;
+            mask++;
+        }while(tmp > 9);
+        int length = maxFileLength(command, dpall, n, 1) - mask;
+
+        for(int i = 0; i < length; ++i) {
+            printf(" ");
         }
-        int length = maxFileLength(command, &dp, n, 1) - mask;
-        for(int i = 0; i < length; ++i) printf(" ");
         printf("%lu ",st->st_ino);
     }
     if(command & Cs) {
         int mask = 1;
-        int tmp = st->st_blocks / 2;
-        while(tmp > 9) {
+        long int tmp = st->st_blocks / 2;
+        do {
             tmp /= 10;
-            mask *= 10;
+            mask++;
+        }while(tmp > 9);
+        int length = maxFileLength(command, dpall, n, 2) - mask;
+
+        for(int i = 0; i < length; ++i) {
+            printf("我在");
+            printf(" ");
         }
-        int length = maxFileLength(command, &dp, n, 2) - mask;
-        for(int i = 0; i < length; ++i) printf(" ");
         printf("%ld ",st->st_blocks / 2);
     }
 }
@@ -268,7 +288,7 @@ int HowManyDirpath(int argc, char* argv[]) {
 }
 
 int shouldPrintA(int command, struct dirent* dp) {
-    if(dp->d_name[0] == '.') return (command & Ca);
+    if(dp->d_name[0] == '.' || strcmp(dp->d_name, "..") == 0) return (command & Ca);
     return 1;
 }
 
@@ -276,35 +296,37 @@ int maxFileLength(int command, struct dirent** dp, int n, int res) {
     int max_name = 0, max_i = 0, max_s = 0;
     for(int i = 0; i < n; ++i) {
         if(!shouldPrintA(command, dp[i])) continue;
-        max_name = ((int)strlen(dp[i]->d_name) > max_name ) ? (int)strlen(dp[i]->d_name) : max_name;
+        max_name = ((int)strlen(dp[i]->d_name) >= max_name ) ? (int)strlen(dp[i]->d_name) : max_name;
     }
-    max_name += 2;
     for(int i = 0; i < n && command & Ci; ++i) {
         if(!shouldPrintA(command, dp[i])) continue;
         int mask = 1;
         int tmp = dp[i]->d_ino;
         do {
             tmp /= 10;
-            mask *= 10;
+            mask++;
         }while(tmp > 9);
-        max_i = mask > max_i ? mask : max_i;
+        max_i = mask >= max_i ? mask : max_i;
     }
-    max_i += 1;
     struct stat st;
     for(int i = 0; i < n && command & Cs; ++i) {
         if(!shouldPrintA(command, dp[i])) continue;
         lstat(dp[i]->d_name, &st);
         int mask = 1;
-        int tmp = st.st_blocks / 2;
+        int tmp = st.st_blocks;
         do {
             tmp /= 10;
-            mask *= 10;
+            mask++;
         }while(tmp > 9);
-        max_s = mask > max_s ? mask : max_s;
+        max_s = mask >= max_s ? mask : max_s;
     }
-    max_s += 1;
-    if(res == 1) return max_i;
-    else if(res == 2) return max_s;
-    else if(res == 3) return max_name;
-    return max_name + max_i + max_s; 
+    
+    int r;
+    switch (res) {
+        case 0:r = max_name + max_i + max_s;break; 
+        case 1:r = max_i;break;
+        case 2:r = max_s;break;
+        case 3:r = max_name;break;
+    }
+    return r; 
 }
