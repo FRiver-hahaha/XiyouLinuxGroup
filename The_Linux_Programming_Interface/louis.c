@@ -1,5 +1,3 @@
-//12.14 当前问题：longlist的对齐太多了
-
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,12 +40,11 @@ int CompareListTime(const struct dirent**, const struct dirent**);//按照最新
 int HowManyDirpath(int, char*[]);//确定目标路径的数量
 int shouldPrintA(int, struct dirent*);//是否需要打印隐藏文件
 int maxFileLength(int, struct dirent**, int, int);//确定每个文件的宽度
-char* getColor(struct stat);
-int maxLink(struct dirent**, struct stat, int, int);
-int maxStsize(struct dirent**, struct stat, int, int);
-void printList(char [], const char*, struct dirent**, struct stat, int, int, int, int, int, int, int);
-void printLongList(char [], char [], const char*, struct dirent**, int, int, int, int);
-
+char* getColor(struct stat);//返回颜色
+int maxLink(struct dirent**, struct stat, int, int);//最大链接数
+int maxStsize(struct dirent**, struct stat, int, int);//最大内存块宽度
+void printList(char [], const char*, struct dirent**, struct stat, int, int, int, int, int, int, int);//粗展示
+void printLongList(char [], char [], const char*, struct dirent**, int, int, int, int);//细展示
 
 int main(int argc, char* argv[]) {
     int tmpargc = HowManyDirpath(argc, argv);
@@ -82,8 +79,7 @@ int maxLink(struct dirent** dp, struct stat st, int n, int command) {
 }
 
 int maxStsize(struct dirent** dp, struct stat st, int n, int command) {
-    int max = 1;
-    int mask = 1;
+    int max = 1, mask = 1;
     int tmpst_size = st.st_size;
     for(int i = 0; i < n; i++) {
         if(!shouldPrintA(command, dp[i])) continue;
@@ -105,34 +101,26 @@ char* getColor(struct stat st) {
     else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
     else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
     else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
-
     return color;
 }
 
 int CompareListTime(const struct dirent** a, const struct dirent** b) {
     struct stat sta, stb;
     lstat((*a)->d_name, &sta);lstat((*b)->d_name, &stb);
-     return sta.st_mtime >= stb.st_mtime ? -1 : 1;
+    return sta.st_mtime >= stb.st_mtime ? -1 : 1;
 }
 
 int isfastoutput(int argc, char* argv[]) {
-    if(argc == 1 || (argc == 2 && argv[1][0] == '-')) {
-        return 1;
-    }
+    if(argc == 1 || (argc == 2 && argv[1][0] == '-')) return 1;
     return 0;
 }
 
-void printList(char fullpath[], const char* dirpath, struct dirent** dp, struct stat st, int n, int i, int j, 
+void printList(char fullpath[], const char* dirpath, struct dirent** dp, struct stat st, int n, int i, int enter, 
                                                                 int Time, int command,int maxName, int size) {
     snprintf(fullpath, size, "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
     lstat(fullpath, &st);//获取文件详细信息
-    
     if(!shouldPrintA(command, dp[i])) return;
-
-    if(j > Time && i != 0) {
-        printf("\n");
-    }
-
+    if(enter > Time && i != 0) printf("\n");
     char* color = COLOR_RESET;
     printWithis(command, &st, n, dp);
     if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
@@ -141,13 +129,13 @@ void printList(char fullpath[], const char* dirpath, struct dirent** dp, struct 
     else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
     else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
     else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
-    if(j <= Time) {
-        j++;
+    if(enter <= Time) {
+        enter++;
         printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
     }
     else {
         printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
-        j = 2;
+        enter = 2;
     }
 }
 
@@ -155,11 +143,13 @@ void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, stru
                                              int n, int i, int command, int size) {
     struct stat st;
     struct tm* tm;
+    struct passwd* pw;
+    struct group* gr;
+    char str[11];
     snprintf(fullbuffer, size, "%s/%s", dirpath, dp[i]->d_name);
     lstat(fullbuffer, &st);
     if(!shouldPrintA(command, dp[i])) return;
     printWithis(command, &st, n, dp);
-    char str[11];
     str[0] = '?';
     if(S_ISDIR(st.st_mode)) str[0] = 'd';
     else if(S_ISLNK(st.st_mode)) str[0] = 'l';
@@ -180,10 +170,10 @@ void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, stru
     str[10] = '\0';
     tm = localtime(&st.st_mtime);
     strftime(tmbuffer, size, "%m月 %H:%M", tm);
-    struct passwd* pw = getpwuid(st.st_uid);
-    struct group* gr = getgrgid(st.st_gid);
-    printf("%s %*ld %s %s %*ld %s %s%s%s\n", str, maxLink(dp, st, n, command), (long)st.st_nlink, pw->pw_name, gr->gr_name, 
-                                            maxStsize(dp, st, n, command), (long)st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
+    pw = getpwuid(st.st_uid);
+    gr = getgrgid(st.st_gid);
+    printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, 
+                                            st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
 }
 
 void listFiles(const char* dirpath, int command, int tmpargc) {
@@ -192,64 +182,58 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         fprintf(stderr, "无法访问 '%s': 没有那个文件或目录\n", dirpath);
         return;
     }
-    int n;
+    int n, maxLength, maxName, Time, enter = 2;
+    int term_width = 80;//默认
+    long long sum = 0;
     struct dirent** dp;
     struct stat st;
+    struct winsize w;
     char fullpath[1024];
-    if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
-        if(command & Ct) {
-            n = scandir(dirpath, &dp, NULL, CompareListTime);
-        }
-        else n = scandir(dirpath, &dp, NULL, CompareListNormal);
-        if(n < 0 && dirpath[0]) {
-            perror("scandir");
-            return;
-        }
-        if(tmpargc > 1) printf("%s:\n",dirpath);
-        if(command & Cs) {
-            long long sum = 0;
-            for(int i = 0; i < n; ++i) {
-                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
-                lstat(fullpath, &st);
-                if(!shouldPrintA(command, dp[i])) continue;
-                sum += st.st_blocks / 2;
-            }
-            printf("总计 %lld\n",sum);
-        }
-
-        int term_width = 80;//默认
-        struct winsize w;
-        if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)term_width = w.ws_col;
-        int maxLength = maxFileLength(command, dp, n, 0);
-        int maxName = maxFileLength(command, dp, n, 3);
-        int Time = term_width / (maxLength + 4);
-        Time = Time <= 0 ? 1 : Time;
-        int j = 2;
-        for(int i = 0; i < n && !(command & Cr); i++) printList(fullpath, dirpath, dp, st, n, i, j, Time, command, maxName, sizeof(fullpath));
-
-        for(int i = n - 1; i >= 0 && command & Cr; i--) printList(fullpath, dirpath, dp, st, n, i, j, Time, command, maxName, sizeof(fullpath));
+    if(command & Ct)    n = scandir(dirpath, &dp, NULL, CompareListTime);
+    else                n = scandir(dirpath, &dp, NULL, CompareListNormal);
+    if(n < 0 && dirpath[0]) {
+        perror("scandir");
+        return;
     }
-    else {
-        if(command & Ct) {
-            n = scandir(dirpath, &dp, NULL, CompareListTime);
+    if(tmpargc > 1) printf("%s:\n",dirpath);
+    if(command & Cs) {
+        for(int i = 0; i < n; ++i) {
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            lstat(fullpath, &st);
+            if(!shouldPrintA(command, dp[i])) continue;
+            sum += st.st_blocks / 2;
         }
-        else n = scandir(dirpath, &dp, NULL, CompareListNormal);
-        if(n < 0 && dirpath[0]) {
-            perror("scandir");
-            return;
-        }
-        if(tmpargc > 1) printf("%s:\n",dirpath);
-        if(command & Cs) {
-            long long sum = 0;
-            for(int i = 0; i < n; ++i) {
-                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
-                lstat(fullpath, &st);
-                if(!shouldPrintA(command, dp[i])) continue;
-                sum += st.st_blocks / 2;
+        printf("总计 %lld\n",sum);
+    }
+    if(!(command & Cl)) {//根据是否需要详细排列，分成两种方案
+        if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)term_width = w.ws_col;
+        maxLength = maxFileLength(command, dp, n, 0);
+        maxName = maxFileLength(command, dp, n, 3);
+        Time = term_width / (maxLength + 4);
+        Time = Time <= 0 ? 1 : Time;
+        for(int i = 0; i < n && !(command & Cr); i++) printList(fullpath, dirpath, dp, st, n, i, enter, Time, command, maxName, sizeof(fullpath));
+        for(int i = n - 1; i >= 0 && command & Cr; i--) printList(fullpath, dirpath, dp, st, n, i, enter, Time, command, maxName, sizeof(fullpath));
+    }
+    else LongList(dirpath, dp, n, command);
+    if(command & CR) {
+        char** Rarr  = (char**)malloc(sizeof(char*) * 4096);
+        int count = 0;
+        for(int i = 0; i < n; i++) {
+            if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            lstat(fullpath, &st);
+            if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
+                Rarr[count] = (char*)malloc(sizeof(char) * (sizeof(fullpath) + 1));
+                strcpy(Rarr[count], fullpath);
+                count++;
             }
-            printf("总计 %lld\n",sum);
         }
-        LongList(dirpath, dp, n, command);
+        for(int i = 0; i < count; i++) {
+            printf("\n%s:\n", Rarr[i]);
+            listFiles(Rarr[i], command, tmpargc);
+        }
+        for(int i = 0; i < count; i++) free(Rarr[i]);
+        free(Rarr);
     }
     for(int i = 0; i < n; i++) free(dp[i]);
     free(dp);
@@ -264,30 +248,16 @@ int whatCommand(int argc, char* argv[]) {
         if(argv[i][0] != '-') {
             continue;
         }else {
-            int j = 1;
-            while(argv[i][j] != '\0') {
-                switch (argv[i][j++]) {
-                    case 'a':
-                        command |= Ca;
-                        break;
-                    case 'l':
-                        command |= Cl;
-                        break;
-                    case 'R':
-                        command |= CR;
-                        break;
-                    case 't':
-                        command |= Ct;
-                        break;
-                    case 'r':
-                        command |= Cr;
-                        break;
-                    case 'i':
-                        command |= Ci;
-                        break;
-                    case 's':
-                        command |= Cs;
-                        break;
+            int enter = 1;
+            while(argv[i][enter] != '\0') {
+                switch (argv[i][enter++]) {
+                    case 'a':command |= Ca;break;
+                    case 'l':command |= Cl;break;
+                    case 'R':command |= CR;break;
+                    case 't':command |= Ct;break;
+                    case 'r':command |= Cr;break;
+                    case 'i':command |= Ci;break;
+                    case 's':command |= Cs;break;
                     default:fprintf(stderr, "可用选项：-a, -l, -R, -t, -r, -i, -s\n");
                        exit(EXIT_FAILURE);
                 }
@@ -345,7 +315,8 @@ int shouldPrintA(int command, struct dirent* dp) {
 }
 
 int maxFileLength(int command, struct dirent** dp, int n, int res) {
-    int max_name = 0, max_i = 0, max_s = 0;
+    int max_name = 0, max_i = 0, max_s = 0, r = 0;
+    struct stat st;
     for(int i = 0; i < n; ++i) {
         if(!shouldPrintA(command, dp[i])) continue;
         max_name = ((int)strlen(dp[i]->d_name) >= max_name ) ? (int)strlen(dp[i]->d_name) : max_name;
@@ -360,7 +331,6 @@ int maxFileLength(int command, struct dirent** dp, int n, int res) {
         }while(tmp > 9);
         max_i = mask >= max_i ? mask : max_i;
     }
-    struct stat st;
     for(int i = 0; i < n && command & Cs; ++i) {
         if(!shouldPrintA(command, dp[i])) continue;
         lstat(dp[i]->d_name, &st);
@@ -372,8 +342,6 @@ int maxFileLength(int command, struct dirent** dp, int n, int res) {
         }while(tmp > 9);
         max_s = mask >= max_s ? mask : max_s;
     }
-    
-    int r;
     switch (res) {
         case 0:r = max_name + max_i + max_s;break; 
         case 1:r = max_i;break;
