@@ -144,3 +144,34 @@
 4. 比较函数
 
 - 返回值：成功读入的个数、-1(报错)
+
+## strftime(buf,buf_size,format,timeptr)
+- 定义：将格式化时间保存至buf内
+
+- 位置：#include <time.h>
+
+- 参数；
+1. buf:写入格式化时间的缓冲区
+2. buf_size:目标写入缓冲区大小
+3. format:目标格式化时间
+4. timeptr:指向tm结构的指针
+
+- 返回值：成功写入的个数
+
+## getpwuid(uid)
+- 定义：获取用户名
+
+- 位置：#include <pwd.h>
+
+- 参数：uid:用户名
+
+- 返回值：目标用户名
+
+## getgrgid(gid)
+- 定义：获取组名
+
+- 位置：#include <grp.h>
+
+- 参数：gid:组名
+
+- 返回值：目标组名
