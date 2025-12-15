@@ -43,7 +43,6 @@ int maxFileLength(int, struct dirent**, int, int);//确定每个文件的宽度
 char* getColor(struct stat);//返回颜色
 int maxLink(struct dirent**, struct stat, int, int);//最大链接数
 int maxStsize(struct dirent**, struct stat, int, int);//最大内存块宽度
-void printList(char [], const char*, struct dirent**, struct stat, int, int, int, int, int, int, int);//粗展示
 void printLongList(char [], char [], const char*, struct dirent**, int, int, int, int);//细展示
 
 int main(int argc, char* argv[]) {
@@ -63,8 +62,7 @@ int main(int argc, char* argv[]) {
 }
 
 int maxLink(struct dirent** dp, struct stat st, int n, int command) {
-    int max = 1;
-    int mask = 1;
+    int max = 1, mask = 1;
     int tmpst_nlink = st.st_nlink;
     for(int i = 0; i < n; i++) {
         if(!shouldPrintA(command, dp[i])) continue;
@@ -111,36 +109,13 @@ int CompareListTime(const struct dirent** a, const struct dirent** b) {
 }
 
 int isfastoutput(int argc, char* argv[]) {
-    if(argc == 1 || (argc == 2 && argv[1][0] == '-')) return 1;
+    int cnt = 0;
+    for(int i = 1; i < argc; ++i) if(argv[i][0] == '-') cnt++;
+    if(cnt == argc - 1 || argc == 1) return 1; 
     return 0;
 }
 
-void printList(char fullpath[], const char* dirpath, struct dirent** dp, struct stat st, int n, int i, int enter, 
-                                                                int Time, int command,int maxName, int size) {
-    snprintf(fullpath, size, "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
-    lstat(fullpath, &st);//获取文件详细信息
-    if(!shouldPrintA(command, dp[i])) return;
-    if(enter > Time && i != 0) printf("\n");
-    char* color = COLOR_RESET;
-    printWithis(command, &st, n, dp);
-    if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
-    else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
-    else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
-    else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
-    else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
-    else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
-    if(enter <= Time) {
-        enter++;
-        printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
-    }
-    else {
-        printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
-        enter = 2;
-    }
-}
-
-void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, struct dirent** dp, 
-                                             int n, int i, int command, int size) {
+void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, struct dirent** dp, int n, int i, int command, int size) {
     struct stat st;
     struct tm* tm;
     struct passwd* pw;
@@ -172,8 +147,7 @@ void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, stru
     strftime(tmbuffer, size, "%m月 %H:%M", tm);
     pw = getpwuid(st.st_uid);
     gr = getgrgid(st.st_gid);
-    printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, 
-                                            st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
+    printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
 }
 
 void listFiles(const char* dirpath, int command, int tmpargc) {
@@ -182,15 +156,14 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         fprintf(stderr, "无法访问 '%s': 没有那个文件或目录\n", dirpath);
         return;
     }
-    int n, maxLength, maxName, Time, enter = 2;
-    int term_width = 80;//默认
+    int n, maxLength, maxName, Time, enter = 2, term_width = 80;//默认
     long long sum = 0;
     struct dirent** dp;
     struct stat st;
     struct winsize w;
     char fullpath[1024];
-    if(command & Ct)    n = scandir(dirpath, &dp, NULL, CompareListTime);
-    else                n = scandir(dirpath, &dp, NULL, CompareListNormal);
+    if(command & Ct) n = scandir(dirpath, &dp, NULL, CompareListTime);
+    else n = scandir(dirpath, &dp, NULL, CompareListNormal);
     if(n < 0 && dirpath[0]) {
         perror("scandir");
         return;
@@ -211,8 +184,50 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         maxName = maxFileLength(command, dp, n, 3);
         Time = term_width / (maxLength + 4);
         Time = Time <= 0 ? 1 : Time;
-        for(int i = 0; i < n && !(command & Cr); i++) printList(fullpath, dirpath, dp, st, n, i, enter, Time, command, maxName, sizeof(fullpath));
-        for(int i = n - 1; i >= 0 && command & Cr; i--) printList(fullpath, dirpath, dp, st, n, i, enter, Time, command, maxName, sizeof(fullpath));
+        for(int i = 0; i < n && !(command & Cr); i++) {
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            lstat(fullpath, &st);//获取文件详细信息
+            if(!shouldPrintA(command, dp[i])) return;
+            if(enter > Time && i != 0) printf("\n");
+            char* color = COLOR_RESET;
+            printWithis(command, &st, n, dp);
+            if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
+            else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
+            else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
+            else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
+            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
+            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
+            if(enter <= Time) {
+                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                enter++;
+            }
+            else {
+                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                enter = 2;
+            }
+        }
+        for(int i = n - 1; i >= 0 && command & Cr; i--) {
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            lstat(fullpath, &st);//获取文件详细信息
+            if(!shouldPrintA(command, dp[i])) return;
+            if(enter > Time && i !=  n - 1) printf("\n");
+            char* color = COLOR_RESET;
+            printWithis(command, &st, n, dp);
+            if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
+            else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
+            else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
+            else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
+            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
+            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
+            if(enter <= Time) {
+                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                enter++;
+            }
+            else {
+                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                enter = 2;
+            }
+        }
     }
     else LongList(dirpath, dp, n, command);
     if(command & CR) {
@@ -241,13 +256,10 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
 
 int whatCommand(int argc, char* argv[]) {
     int command = 0;
-    if(argc == 1) {
-        return 0;
-    }
+    if(argc == 1) return 0;
     for(int i = 1; i < argc; ++i) {
-        if(argv[i][0] != '-') {
-            continue;
-        }else {
+        if(argv[i][0] != '-') continue;
+        else {
             int enter = 1;
             while(argv[i][enter] != '\0') {
                 switch (argv[i][enter++]) {
