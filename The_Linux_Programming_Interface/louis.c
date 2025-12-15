@@ -12,13 +12,13 @@
 #include <inttypes.h>
 
 // 掩码确定参数 
-#define Ca              0b1               // 显示隐藏文件排列1
+#define Ca              0b1               // 显示隐藏文件排列
 #define Cl              0b10              // 详细排列
 #define CR              0b100             // 递归排列    
-#define Ct              0b1000            // 按照最新一次修改时间降序排列1
-#define Cr              0b10000           // 逆序排列1
-#define Ci              0b100000          // 显示inode编号排列1
-#define Cs              0b1000000         // 显示已用内存块数量排列1
+#define Ct              0b1000            // 按照最新一次修改时间降序排列
+#define Cr              0b10000           // 逆序排列
+#define Ci              0b100000          // 显示inode编号排列
+#define Cs              0b1000000         // 显示已用内存块数量排列
 
 // 确定颜色
 #define COLOR_RESET     "\033[0m"
@@ -76,26 +76,23 @@ int CompareListTime(const struct dirent** a, const struct dirent** b) {
 
 int isfastoutput(int argc, char* argv[]) {
     int cnt = 0;        
-    for(int i = 1; i < argc; i++) {
-        if(argv[i][0] == '-') cnt++;
-    }
+    for(int i = 1; i < argc; i++) if(argv[i][0] == '-') cnt++;
     if(cnt == argc - 1) return 1;
     return 0;
 }
 
 void listFiles(const char* dirpath, int command, int tmpargc) {
     if(dirpath[0] == '-') return;
-    if(access(dirpath, F_OK) != 0) {
+    if(access(dirpath, F_OK | X_OK) != 0) {
         fprintf(stderr, "无法访问 '%s': 没有那个文件或目录\n", dirpath);
         return;
     }
-    int n, maxLength, maxName, Time, enter = 2, term_width = 80;//默认
+    int n, maxLength, maxName, Time, enter = 2,fullpath_size = 1024 , term_width = 80;//默认
     long long sum = 0;
     struct dirent** dp;
     struct stat st;
     struct winsize w;
-    char fullpath[1024];
-    char** Rarr  = (char**)malloc(sizeof(char*) * 1024 * 1024);
+    char* fullpath = (char*)malloc(sizeof(char) * fullpath_size);
     if(command & Ct) n = scandir(dirpath, &dp, NULL, CompareListTime);
     else n = scandir(dirpath, &dp, NULL, CompareListNormal);
     if(n < 0 && dirpath[0]) {
@@ -105,7 +102,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     if(tmpargc > 1) printf("%s:\n",dirpath);
     if(command & Cs) {
         for(int i = 0; i < n; ++i) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(!shouldPrintA(command, dp[i])) continue;
             sum += st.st_blocks / 2;
@@ -119,7 +116,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         Time = term_width / (maxLength + 4);
         Time = Time <= 0 ? 1 : Time;
         for(int i = 0; i < n && !(command & Cr); i++) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
             if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i != 0) printf("\n");
@@ -135,7 +132,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             }
         }
         for(int i = n - 1; i >= 0 && (command & Cr); i--) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
             if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i !=  n - 1) printf("\n");
@@ -159,7 +156,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         struct group* gr;
         char str[11];
         for(int i = 0 ; i < n && !(command & Cr); i++) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(!shouldPrintA(command, dp[i])) continue;
             printWithis(command, &st, n, dp);
@@ -182,14 +179,13 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             str[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
             str[10] = '\0';
             tm = localtime(&st.st_mtime);
-            strftime(tmbuffer, sizeof(fullpath), "%m月 %H:%M", tm);
+            strftime(tmbuffer, fullpath_size, "%m月 %H:%M", tm);
             pw = getpwuid(st.st_uid);
             gr = getgrgid(st.st_gid);
             printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
         }
-
         for(int i = n - 1 ; i >= 0 && (command & Cr); i--) {
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(!shouldPrintA(command, dp[i])) continue;
             printWithis(command, &st, n, dp);
@@ -212,36 +208,48 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             str[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
             str[10] = '\0';
             tm = localtime(&st.st_mtime);
-            strftime(tmbuffer, sizeof(fullpath), "%m月 %H:%M", tm);
+            strftime(tmbuffer, fullpath_size, "%m月 %H:%M", tm);
             pw = getpwuid(st.st_uid);
             gr = getgrgid(st.st_gid);
             printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
         }
     }
     if(command & CR) {
+        int Rarr_size = 1024;
+        char** Rarr  = (char**)malloc(sizeof(char*) * Rarr_size);
         int count = 0;
         for(int i = 0; i < n && !(command & Cr); i++) {
             if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
-                Rarr[count] = (char*)malloc(sizeof(char) * (sizeof(fullpath) + 1));
+                if(strlen(fullpath) >= (fullpath_size + 1)) {
+                    fullpath_size *= 2;
+                    fullpath = (char*)realloc(fullpath, sizeof(char) * fullpath_size);
+                }
+                Rarr[count] = (char*)malloc(sizeof(char) * (fullpath_size + 1));
                 strcpy(Rarr[count], fullpath);
                 count++;
+                if(count >= Rarr_size) {
+                    Rarr_size *= 2;
+                    Rarr = (char**)realloc(Rarr, sizeof(char*) * Rarr_size);
+                }
             }
         }
-
         for(int i = n - 1; i >= 0 && command & Cr; i--) {
             if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
-                Rarr[count] = (char*)malloc(sizeof(char) * (sizeof(fullpath) + 1));
+                if(strlen(fullpath) >= (fullpath_size + 1)) {
+                    fullpath_size *= 2;
+                    fullpath = (char*)realloc(fullpath, sizeof(char) * fullpath_size);
+                }
+                Rarr[count] = (char*)malloc(sizeof(char) * fullpath_size + 1);
                 strcpy(Rarr[count], fullpath);
                 count++;
             }
         }
-
         for(int i = 0; i < count; i++) {
             printf("\n%s:\n", Rarr[i]);
             listFiles(Rarr[i], command, tmpargc);
@@ -254,12 +262,11 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
 }
 
 int whatCommand(int argc, char* argv[]) {
-    int command = 0;
+    int command = 0, enter = 1;
     if(argc == 1) return 0;
     for(int i = 1; i < argc; ++i) {
         if(argv[i][0] != '-') continue;
         else {
-            int enter = 1;
             while(argv[i][enter] != '\0') {
                 switch (argv[i][enter++]) {
                     case 'a':command |= Ca;break;
