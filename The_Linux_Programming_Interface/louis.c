@@ -110,8 +110,8 @@ int CompareListTime(const struct dirent** a, const struct dirent** b) {
 
 int isfastoutput(int argc, char* argv[]) {
     int cnt = 0;
-    for(int i = 1; i < argc; ++i) if(argv[i][0] == '-') cnt++;
-    if(cnt == argc - 1 || argc == 1) return 1; 
+    for(int i = 1; i < argc; i++) if(argv[i][0] == '-') cnt++;
+    if(cnt == argc - 1) return 1;
     return 0;
 }
 
@@ -233,7 +233,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     if(command & CR) {
         char** Rarr  = (char**)malloc(sizeof(char*) * 4096);
         int count = 0;
-        for(int i = 0; i < n; i++) {
+        for(int i = 0; i < n && !(command & Cr); i++) {
             if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
@@ -243,6 +243,18 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
                 count++;
             }
         }
+
+        for(int i = n - 1; i >= 0 && command & Cr; i--) {
+            if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            lstat(fullpath, &st);
+            if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
+                Rarr[count] = (char*)malloc(sizeof(char) * (sizeof(fullpath) + 1));
+                strcpy(Rarr[count], fullpath);
+                count++;
+            }
+        }
+
         for(int i = 0; i < count; i++) {
             printf("\n%s:\n", Rarr[i]);
             listFiles(Rarr[i], command, tmpargc);
@@ -355,7 +367,7 @@ int maxFileLength(int command, struct dirent** dp, int n, int res) {
         max_s = mask >= max_s ? mask : max_s;
     }
     switch (res) {
-        case 0:r = max_name + max_i + max_s;break; 
+        case 0:r = max_name + max_i + max_s;break;
         case 1:r = max_i;break;
         case 2:r = max_s;break;
         case 3:r = max_name;break;
