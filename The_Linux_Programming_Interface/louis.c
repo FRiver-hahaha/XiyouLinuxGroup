@@ -21,7 +21,7 @@
 #define Cs              0b1000000         // 显示已用内存块数量排列1
 
 // 确定颜色
-#define COLOR_RESET      "\033[0m"
+#define COLOR_RESET     "\033[0m"
 #define COLOR_DIR       "\033[1;34m"    // 粗体蓝色
 #define COLOR_EXE       "\033[1;32m"    // 粗体绿色
 #define COLOR_LINK      "\033[1;36m"    // 粗体青色
@@ -31,7 +31,6 @@
 #define COLOR_CHAR      "\033[1;33m"    // 粗体黄色（字符设备:键鼠）
 
 void listFiles(const char*, int, int);//根据参数，普通列出目录下的文件
-void LongList(const char*, struct dirent**, int, int);//详细列出目录下的文件
 void printWithis(int, struct stat*, int, struct dirent**);//显示
 int isfastoutput(int, char*[]);//命令行中传入的参数是否只有该可执行文件
 int whatCommand(int, char*[]);//确定参数
@@ -41,9 +40,6 @@ int HowManyDirpath(int, char*[]);//确定目标路径的数量
 int shouldPrintA(int, struct dirent*);//是否需要打印隐藏文件
 int maxFileLength(int, struct dirent**, int, int);//确定每个文件的宽度
 char* getColor(struct stat);//返回颜色
-int maxLink(struct dirent**, struct stat, int, int);//最大链接数
-int maxStsize(struct dirent**, struct stat, int, int);//最大内存块宽度
-void printLongList(char [], char [], const char*, struct dirent**, int, int, int, int);//细展示
 
 int main(int argc, char* argv[]) {
     int tmpargc = HowManyDirpath(argc, argv);
@@ -59,36 +55,6 @@ int main(int argc, char* argv[]) {
         }
     }
     exit(EXIT_SUCCESS);
-}
-
-int maxLink(struct dirent** dp, struct stat st, int n, int command) {
-    int max = 1, mask = 1;
-    int tmpst_nlink = st.st_nlink;
-    for(int i = 0; i < n; i++) {
-        if(!shouldPrintA(command, dp[i])) continue;
-        lstat(dp[i]->d_name, &st);
-        do {
-            mask++;
-            tmpst_nlink /= 10;
-        }while(tmpst_nlink > 9);
-        max = mask > max ? mask : max;
-    }
-    return max;
-}
-
-int maxStsize(struct dirent** dp, struct stat st, int n, int command) {
-    int max = 1, mask = 1;
-    int tmpst_size = st.st_size;
-    for(int i = 0; i < n; i++) {
-        if(!shouldPrintA(command, dp[i])) continue;
-        lstat(dp[i]->d_name, &st);
-        do {
-            mask++;
-            tmpst_size /= 10;
-        }while(tmpst_size > 9);
-        max = mask > max ? mask : max;
-    }
-    return max;
 }
 
 char* getColor(struct stat st) {
@@ -117,41 +83,6 @@ int isfastoutput(int argc, char* argv[]) {
     return 0;
 }
 
-void printLongList(char fullbuffer[], char tmbuffer[], const char* dirpath, struct dirent** dp, int n, int i, int command, int size) {
-    struct stat st;
-    struct tm* tm;
-    struct passwd* pw;
-    struct group* gr;
-    char str[11];
-    snprintf(fullbuffer, size, "%s/%s", dirpath, dp[i]->d_name);
-    lstat(fullbuffer, &st);
-    if(!shouldPrintA(command, dp[i])) return;
-    printWithis(command, &st, n, dp);
-    str[0] = '?';
-    if(S_ISDIR(st.st_mode)) str[0] = 'd';
-    else if(S_ISLNK(st.st_mode)) str[0] = 'l';
-    else if(S_ISSOCK(st.st_mode)) str[0] = 's';
-    else if(S_ISFIFO(st.st_mode)) str[0] = 'p';
-    else if(S_ISBLK(st.st_mode)) str[0] = 'b';
-    else if(S_ISCHR(st.st_mode)) str[0] = 'c';
-    else str[0] = '-';
-    str[1] = (st.st_mode & S_IRUSR) ? 'r' : '-';
-    str[2] = (st.st_mode & S_IWUSR) ? 'w' : '-';
-    str[3] = (st.st_mode & S_IXUSR) ? 'x' : '-';
-    str[4] = (st.st_mode & S_IRGRP) ? 'r' : '-';
-    str[5] = (st.st_mode & S_IWGRP) ? 'w' : '-';
-    str[6] = (st.st_mode & S_IXGRP) ? 'x' : '-';
-    str[7] = (st.st_mode & S_IROTH) ? 'r' : '-';
-    str[8] = (st.st_mode & S_IWOTH) ? 'w' : '-';
-    str[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
-    str[10] = '\0';
-    tm = localtime(&st.st_mtime);
-    strftime(tmbuffer, size, "%m月 %H:%M", tm);
-    pw = getpwuid(st.st_uid);
-    gr = getgrgid(st.st_gid);
-    printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
-}
-
 void listFiles(const char* dirpath, int command, int tmpargc) {
     if(dirpath[0] == '-') return;
     if(access(dirpath, F_OK) != 0) {
@@ -164,6 +95,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     struct stat st;
     struct winsize w;
     char fullpath[1024];
+    char** Rarr  = (char**)malloc(sizeof(char*) * 1024 * 1024);
     if(command & Ct) n = scandir(dirpath, &dp, NULL, CompareListTime);
     else n = scandir(dirpath, &dp, NULL, CompareListNormal);
     if(n < 0 && dirpath[0]) {
@@ -189,51 +121,104 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         for(int i = 0; i < n && !(command & Cr); i++) {
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
-            if(!shouldPrintA(command, dp[i])) return;
+            if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i != 0) printf("\n");
             char* color = COLOR_RESET;
             printWithis(command, &st, n, dp);
-            if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
-            else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
-            else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
-            else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
-            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
-            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
             if(enter <= Time) {
-                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
                 enter++;
             }
             else {
-                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
                 enter = 2;
             }
         }
-        for(int i = n - 1; i >= 0 && command & Cr; i--) {
+        for(int i = n - 1; i >= 0 && (command & Cr); i--) {
             snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);//将几个字符串以整体的形式送到缓冲区，且函数本身可以防止溢出
             lstat(fullpath, &st);//获取文件详细信息
-            if(!shouldPrintA(command, dp[i])) return;
+            if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i !=  n - 1) printf("\n");
             char* color = COLOR_RESET;
             printWithis(command, &st, n, dp);
-            if(S_ISDIR(st.st_mode)) color = COLOR_DIR;
-            else if(S_ISLNK(st.st_mode)) color = COLOR_LINK;
-            else if(S_ISSOCK(st.st_mode)) color = COLOR_SOCKET;
-            else if(S_ISFIFO(st.st_mode)) color = COLOR_PIPE;
-            else if(S_ISBLK(st.st_mode) || S_ISCHR(st.st_mode)) color = COLOR_BLOCK;
-            else if(st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) color = COLOR_EXE;
             if(enter <= Time) {
-                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
                 enter++;
             }
             else {
-                printf("%s%*s%s  ", color, maxName, dp[i]->d_name, COLOR_RESET);
+                printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
                 enter = 2;
             }
         }
     }
-    else LongList(dirpath, dp, n, command);
+    else {
+        char tmbuffer[80];
+        struct stat st;
+        struct tm* tm;
+        struct passwd* pw;
+        struct group* gr;
+        char str[11];
+        for(int i = 0 ; i < n && !(command & Cr); i++) {
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            lstat(fullpath, &st);
+            if(!shouldPrintA(command, dp[i])) continue;
+            printWithis(command, &st, n, dp);
+            str[0] = '?';
+            if(S_ISDIR(st.st_mode)) str[0] = 'd';
+            else if(S_ISLNK(st.st_mode)) str[0] = 'l';
+            else if(S_ISSOCK(st.st_mode)) str[0] = 's';
+            else if(S_ISFIFO(st.st_mode)) str[0] = 'p';
+            else if(S_ISBLK(st.st_mode)) str[0] = 'b';
+            else if(S_ISCHR(st.st_mode)) str[0] = 'c';
+            else str[0] = '-';
+            str[1] = (st.st_mode & S_IRUSR) ? 'r' : '-';
+            str[2] = (st.st_mode & S_IWUSR) ? 'w' : '-';
+            str[3] = (st.st_mode & S_IXUSR) ? 'x' : '-';
+            str[4] = (st.st_mode & S_IRGRP) ? 'r' : '-';
+            str[5] = (st.st_mode & S_IWGRP) ? 'w' : '-';
+            str[6] = (st.st_mode & S_IXGRP) ? 'x' : '-';
+            str[7] = (st.st_mode & S_IROTH) ? 'r' : '-';
+            str[8] = (st.st_mode & S_IWOTH) ? 'w' : '-';
+            str[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
+            str[10] = '\0';
+            tm = localtime(&st.st_mtime);
+            strftime(tmbuffer, sizeof(fullpath), "%m月 %H:%M", tm);
+            pw = getpwuid(st.st_uid);
+            gr = getgrgid(st.st_gid);
+            printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
+        }
+
+        for(int i = n - 1 ; i >= 0 && (command & Cr); i--) {
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, dp[i]->d_name);
+            lstat(fullpath, &st);
+            if(!shouldPrintA(command, dp[i])) continue;
+            printWithis(command, &st, n, dp);
+            str[0] = '?';
+            if(S_ISDIR(st.st_mode)) str[0] = 'd';
+            else if(S_ISLNK(st.st_mode)) str[0] = 'l';
+            else if(S_ISSOCK(st.st_mode)) str[0] = 's';
+            else if(S_ISFIFO(st.st_mode)) str[0] = 'p';
+            else if(S_ISBLK(st.st_mode)) str[0] = 'b';
+            else if(S_ISCHR(st.st_mode)) str[0] = 'c';
+            else str[0] = '-';
+            str[1] = (st.st_mode & S_IRUSR) ? 'r' : '-';
+            str[2] = (st.st_mode & S_IWUSR) ? 'w' : '-';
+            str[3] = (st.st_mode & S_IXUSR) ? 'x' : '-';
+            str[4] = (st.st_mode & S_IRGRP) ? 'r' : '-';
+            str[5] = (st.st_mode & S_IWGRP) ? 'w' : '-';
+            str[6] = (st.st_mode & S_IXGRP) ? 'x' : '-';
+            str[7] = (st.st_mode & S_IROTH) ? 'r' : '-';
+            str[8] = (st.st_mode & S_IWOTH) ? 'w' : '-';
+            str[9] = (st.st_mode & S_IXOTH) ? 'x' : '-';
+            str[10] = '\0';
+            tm = localtime(&st.st_mtime);
+            strftime(tmbuffer, sizeof(fullpath), "%m月 %H:%M", tm);
+            pw = getpwuid(st.st_uid);
+            gr = getgrgid(st.st_gid);
+            printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
+        }
+    }
     if(command & CR) {
-        char** Rarr  = (char**)malloc(sizeof(char*) * 1024 * 1024);
         int count = 0;
         for(int i = 0; i < n && !(command & Cr); i++) {
             if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
@@ -291,13 +276,6 @@ int whatCommand(int argc, char* argv[]) {
         }
     }
     return command;
-}
-
-void LongList(const char* dirpath, struct dirent** list, int n, int command) {
-    char fullbuffer[1024];
-    char tmbuffer[80];
-    for(int i = 0; i < n && !(command & Cr) ; i++) printLongList(fullbuffer, tmbuffer, dirpath, list, n, i, command, sizeof(fullbuffer));
-    for(int i = n - 1; i >= 0 && command & Cr ; i--) printLongList(fullbuffer, tmbuffer, dirpath, list, n, i, command, sizeof(fullbuffer));
 }
 
 int CompareListNormal(const struct dirent** a, const struct dirent** b) {
