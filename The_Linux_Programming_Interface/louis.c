@@ -109,8 +109,10 @@ int CompareListTime(const struct dirent** a, const struct dirent** b) {
 }
 
 int isfastoutput(int argc, char* argv[]) {
-    int cnt = 0;
-    for(int i = 1; i < argc; i++) if(argv[i][0] == '-') cnt++;
+    int cnt = 0;        
+    for(int i = 1; i < argc; i++) {
+        if(argv[i][0] == '-') cnt++;
+    }
     if(cnt == argc - 1) return 1;
     return 0;
 }
@@ -231,7 +233,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
     }
     else LongList(dirpath, dp, n, command);
     if(command & CR) {
-        char** Rarr  = (char**)malloc(sizeof(char*) * 4096);
+        char** Rarr  = (char**)malloc(sizeof(char*) * 1024 * 1024);
         int count = 0;
         for(int i = 0; i < n && !(command & Cr); i++) {
             if(strcmp(dp[i]->d_name, ".") == 0 || strcmp(dp[i]->d_name, "..") == 0) continue;
