@@ -120,7 +120,6 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             lstat(fullpath, &st);//获取文件详细信息
             if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i != 0) printf("\n");
-            char* color = COLOR_RESET;
             printWithis(command, &st, n, dp);
             if(enter <= Time) {
                 printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
@@ -136,7 +135,6 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             lstat(fullpath, &st);//获取文件详细信息
             if(!shouldPrintA(command, dp[i])) continue;
             if(enter > Time && i !=  n - 1) printf("\n");
-            char* color = COLOR_RESET;
             printWithis(command, &st, n, dp);
             if(enter <= Time) {
                 printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
@@ -211,7 +209,12 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             strftime(tmbuffer, fullpath_size, "%m月 %H:%M", tm);
             pw = getpwuid(st.st_uid);
             gr = getgrgid(st.st_gid);
-            printf("%s %lu %s %s %ld %s %s%s%s\n", str, st.st_nlink, pw->pw_name, gr->gr_name, st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
+            printf("%s %lu ", str, st.st_nlink);
+            if(!pw) printf("%d ",st.st_uid);
+            else printf("%s ",pw->pw_name);
+            if(!gr) printf("%d ",st.st_gid);
+            else printf("%s ",gr->gr_name);
+            printf("%ld %s %s%s%s\n", st.st_size, tmbuffer, getColor(st), dp[i]->d_name, COLOR_RESET);
         }
     }
     if(command & CR) {
@@ -223,7 +226,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
-                if(strlen(fullpath) >= (fullpath_size + 1)) {
+                if((int)strlen(fullpath) >= (fullpath_size + 1)) {
                     fullpath_size *= 2;
                     fullpath = (char*)realloc(fullpath, sizeof(char) * fullpath_size);
                 }
@@ -241,7 +244,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             snprintf(fullpath, fullpath_size, "%s/%s", dirpath, dp[i]->d_name);
             lstat(fullpath, &st);
             if(S_ISDIR(st.st_mode) && shouldPrintA(command, dp[i])) {
-                if(strlen(fullpath) >= (fullpath_size + 1)) {
+                if((int)strlen(fullpath) >= (fullpath_size + 1)) {
                     fullpath_size *= 2;
                     fullpath = (char*)realloc(fullpath, sizeof(char) * fullpath_size);
                 }
