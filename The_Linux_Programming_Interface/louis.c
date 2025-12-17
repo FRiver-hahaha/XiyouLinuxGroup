@@ -147,7 +147,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         }
     }
     else {
-        char tmbuffer[80];
+        char* tmbuffer = (char*)malloc(sizeof(char) * 80);
         struct stat st;
         struct tm* tm;
         struct passwd* pw;
