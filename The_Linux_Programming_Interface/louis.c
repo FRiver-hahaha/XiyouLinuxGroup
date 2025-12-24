@@ -27,7 +27,7 @@
 #define COLOR_LINK      "\033[1;36m"    // 粗体青色
 #define COLOR_SOCKET    "\033[1;35m"    // 粗体紫色（socket）
 #define COLOR_PIPE      "\033[33m"      // 黄色（管道）
-#define COLOR_BLOCK     "\033[1;33m"    // 粗体黄色（块设备：u盘，固态)
+#define COLOR_BLOCK     "\033[1;33m"    // 粗体黄色（块设备：u盘，固态
 #define COLOR_CHAR      "\033[1;33m"    // 粗体黄色（字符设备:键鼠）
 
 void listFiles(const char*, int, int);//根据参数，普通列出目录下的文件
@@ -87,7 +87,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
         fprintf(stderr, "无法访问 '%s': 没有那个文件或目录\n", dirpath);
         return;
     }
-    int n, maxLength, maxName, Time, enter = 2,fullpath_size = 1024 , term_width = 80;//默认
+    int n, maxLength, maxName, Time, enter = 1,fullpath_size = 1024 , term_width = 80;//默认
     long long sum = 0;
     struct dirent** dp;
     struct stat st;
@@ -127,7 +127,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             }
             else {
                 printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
-                enter = 2;
+                enter = 1;
             }
         }
         for(int i = n - 1; i >= 0 && (command & Cr); i--) {
@@ -142,7 +142,7 @@ void listFiles(const char* dirpath, int command, int tmpargc) {
             }
             else {
                 printf("%s%*s%s  ", getColor(st), maxName, dp[i]->d_name, COLOR_RESET);
-                enter = 2;
+                enter = 1;
             }
         }
     }
