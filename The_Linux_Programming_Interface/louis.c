@@ -280,7 +280,7 @@ int whatCommand(int argc, char* argv[]) {
                     case 'i':command |= Ci;break;
                     case 's':command |= Cs;break;
                     default:fprintf(stderr, "可用选项：-a, -l, -R, -t, -r, -i, -s\n");
-                       exit(EXIT_FAILURE);
+                       exit(127);
                 }
             }
         }
