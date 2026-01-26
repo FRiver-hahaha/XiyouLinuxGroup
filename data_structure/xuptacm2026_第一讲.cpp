@@ -159,42 +159,109 @@
 //     return 0;
 // }
 
-// G - 查找(二分)
-#include <iostream>
-using namespace std;
-const int N = 1e6+10;
-long long ar[N];
+// // E - 地毯(前缀和 + 差分)
 
-int main() {
-    int n, m;
-    long long left, right, middle;
-    long long x;
-    cin >> n >> m;
-    for(int i = 0; i < n; ++i) {
-        cin >> ar[i];
-    }
+// #include <iostream>
+// #include <vector>
+// using namespace std;
 
-    for(int i = 0; i < m; ++i) {
-        int tt = -1;
-        cin >> x;
-        left = 0;
-        right = n - 1;
-        middle = left + (right - left) / 2;
-        while(left <= right) {
-            middle = left + (right - left) / 2;
-            if(x > ar[middle]) {
-                left = middle + 1;
-            }else if(x < ar[middle]) {
-                right = middle - 1;
-            }
-            else {
-                right = middle - 1;
-                tt = middle + 1;
-            }
+// int main() {
+//     int n, m;
+//     cin >> n >> m;
+//     int i, j;
+//     vector<vector <int>> diff(n + 2, vector<int>(n + 2, 0));
+//     vector<vector <int>> ans(n + 2, vector<int>(n + 2, 0));
+
+//     for(i = 0; i < m; ++i) {
+//         int x1, y1, x2, y2;
+//         cin >> x1 >> y1 >> x2 >> y2;
+//         diff[x1][y1] += 1;
+//         diff[x1][y2 + 1] -= 1;
+//         diff[x2 + 1][y1] -= 1;
+//         diff[x2 + 1][y2 + 1] += 1;
+//     }
+
+//     for(i = 1; i <= n; ++i) {
+//         for(j = 1; j <= n; ++j) {
+//             ans[i][j] = diff[i][j] + ans[i - 1][j] + ans[i][j - 1] - ans[i - 1][j - 1];
+//         }
+//     }
+
+//     for(i = 1; i <= n; ++i) {
+//         for(j = 1;j <= n; ++j) {
+//             cout << ans[i][j] << ' ';
+//         }
+//         cout << endl;
+//     }
+
+//     return 0;
+// }
+
+// // F - 求和(前缀和)
+
+// #include <iostream>
+// using namespace std;
+// const int N = 1e6 + 10;
+// long long arr[N];
+// long long sum[N];
+
+
+// int main() {
+//     int n, i;
+//     cin >> n;
+//     for(i = 1; i <= n; ++i) {
+//         cin >> arr[i];
+//         sum[i] = arr[i] + sum[i - 1];
+//     }
+//     long long x = 0;
+//     for(i = 1; i <= n; ++i) {
+//         x += (sum[n] - sum[i]) * arr[i];
+//     }
+
+//     cout << x << endl;
+
+
+//     return 0;
+// }
+
+// // G - 查找(二分)
+// #include <iostream>
+// using namespace std;
+// const int N = 1e6+10;
+// long long ar[N];
+
+// int main() {
+//     int n, m;
+//     long long left, right, middle;
+//     long long x;
+//     cin >> n >> m;
+//     for(int i = 0; i < n; ++i) {
+//         cin >> ar[i];
+//     }
+
+//     for(int i = 0; i < m; ++i) {
+//         int tt = -1;
+//         cin >> x;
+//         left = 0;
+//         right = n - 1;
+//         middle = left + (right - left) / 2;
+//         while(left <= right) {
+//             middle = left + (right - left) / 2;
+//             if(x > ar[middle]) {
+//                 left = middle + 1;
+//             }else if(x < ar[middle]) {
+//                 right = middle - 1;
+//             }
+//             else {
+//                 right = middle - 1;
+//                 tt = middle + 1;
+//             }
             
-        }
-        cout << tt << " ";
-    }
+//         }
+//         cout << tt << " ";
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
+
+// I - 木材加工()
