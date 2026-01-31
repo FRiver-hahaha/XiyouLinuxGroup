@@ -1,18 +1,14 @@
-#include <iostream>
-using namespace std;
+#include <stdio.h>
+#include <string.h>
 
 int main() {
-    char ar[7];
-    cin >> ar;
-    if(ar[5] >= '3' && ar[5] <= '5') {
-        cout << "spring" << endl;
-    }else if(ar[5] >= '6' && ar[5] <= '8') {
-        cout << "summer" << endl;
-    }else if(ar[5] >= '9' && ar[5] <= '11') {
-        cout << "autumn" << endl;
-    }else if(ar[5] == '12' || ar[5] == '1' || ar[5] == '2') {
-        cout << "winter" << endl;
+    const int N = 1e6;
+    char ch[N];
+    scanf("%s",ch);
+    long long len = strlen(ch);
+    if(ch[1] >= '0' + 5) {
+        ch[0] += 1;
+        ch[1] = '0';
     }
-
-    return 0;
+    printf("%c.%c*10^%lld", ch[0], ch[1], len - 1);
 }
