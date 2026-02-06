@@ -9,3 +9,4 @@
 * 9 -  [高级 CPU 设计 - Advanced CPU Designs](https://www.bilibili.com/video/av11867964/)
 * 10 - [编程史话 - Early Programming](https://www.bilibili.com/video/av13582556/)
 * 11 - [编程语言 - The First Programming Languages](https://www.bilibili.com/video/av14228148/)
+* 12 - [编程原理：语句和函数 - Programming Basics: Statements & Functions](https://www.bilibili.com/video/av14885759/)
