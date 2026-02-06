@@ -1,4 +1,4 @@
-* 1 - [早期的计算 - Early Computing](https://www.bilibili.com/video/av8861057/)
+* 0 - [早期的计算 - Early Computing](https://www.bilibili.com/video/av8861057/)
 * 2 - [电子计算 - Electronic Computing](https://www.bilibili.com/video/av9066628/)
 * 3 - [布尔逻辑与逻辑电路 - Boolean Logic & Logic Gates](https://www.bilibili.com/video/av11557339/)
 * 4 - [二进制 - Representing Numbers and Letters with Binary](https://www.bilibili.com/video/av11592079/)
@@ -7,3 +7,5 @@
 * 7 - [中央处理器 - The Central Processing Unit(CPU)](https://www.bilibili.com/video/av12881976/)
 * 8 - [指令和程序 - Instructions & Programs](https://www.bilibili.com/video/av9875360/)
 * 9 -  [高级 CPU 设计 - Advanced CPU Designs](https://www.bilibili.com/video/av11867964/)
+* 10 - [编程史话 - Early Programming](https://www.bilibili.com/video/av13582556/)
+* 11 - [编程语言 - The First Programming Languages](https://www.bilibili.com/video/av14228148/)
