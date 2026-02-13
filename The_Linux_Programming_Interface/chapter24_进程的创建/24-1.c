@@ -1,7 +1,4 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <error.h>
-#include <stdlib.h>
+#include "tlpi_hdr.h"
 
 /* 这是一个创建进程的程序实例，检验了fork()的功能 */
 
@@ -9,7 +6,7 @@ static int idata = 111;
 
 int main(int argc, char* argv[]) {
     int istack = 222;
-    __pid_t childpid;
+    pid_t childpid;
 
     switch (childpid = fork())// 习惯写法，多路分支
     {
@@ -17,7 +14,7 @@ int main(int argc, char* argv[]) {
         perror("fork");
         exit(EXIT_FAILURE);        
 
-    case 0:
+    case 0:// 父子进程同时进行
         idata *= 3;
         istack *= 3;
         // sleep(3); 可验证没有wait()的情况
