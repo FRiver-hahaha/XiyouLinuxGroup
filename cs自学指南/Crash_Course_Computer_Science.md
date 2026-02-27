@@ -10,3 +10,7 @@
 * 10 - [编程史话 - Early Programming](https://www.bilibili.com/video/av13582556/)
 * 11 - [编程语言 - The First Programming Languages](https://www.bilibili.com/video/av14228148/)
 * 12 - [编程原理：语句和函数 - Programming Basics: Statements & Functions](https://www.bilibili.com/video/av14885759/)
+* 13 - [算法初步 - Intro to Algorithms](https://www.bilibili.com/video/av15987761/)
+* 14 - [数据结构 - Data Structures](https://www.bilibili.com/video/av15987774/)
+* 15 - [阿兰·图灵 - Alan Turing](https://www.bilibili.com/video/av16090115/)
+* 16 - [软件工程 - Software Engineering](https://www.bilibili.com/video/av16751202/)
