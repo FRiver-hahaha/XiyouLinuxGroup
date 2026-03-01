@@ -1,20 +1,57 @@
 // 3.1
 
+// 明天完成路径搜索
+
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <sys/wait.h>// 等待子进程
+#include <string.h>// 字符串比较
+#include <signal.h>// 中断 ctrl + c 信号
 
 #define COLOR_RESET "\033[0m" // 重置 
 #define COLOR_WELCOME "\033[1;34m" // 欢迎界面(粗体蓝色)
 
-void FirstShow();
-void Shell();
+void FirstShow(int argc, char* argv[]);
+void Shell(int argc, char* argv[]);
+void Error(int isError);
 
-int main() {
-    FirstShow();
+int main(int argc, char* argv[]) {
+    signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
+
+    FirstShow(argc, argv);//启动整体程序
     exit(EXIT_SUCCESS);
 }
 
-void FirstShow() {
+/*
+    用来判断用户可能出现的错误。
+    用isError存储错误参数，
+    函数接受参数后执行对应错误码，给用户提示。
+*/
+
+void Error(int isError) {
+    switch (isError) 
+    {
+    case 0:// 退出shell
+        printf("退出shell\n");
+        break;
+
+    case 1:// 路径错误
+        printf("找不到该路径，也可能路径输入错误，请重试...\n");
+        break;
+    
+    default:
+        break;
+    }
+}
+
+/*
+    shell进入的欢迎界面。
+    用了2个字符串指针，之后在两层for循环中，打印界面。
+    最后执行shell函数，进入shell内部。
+*/
+
+void FirstShow(int argc, char* argv[]) {
     int time;
     char ch, flag = '#';
     char* wl = "Welcome";
@@ -37,7 +74,7 @@ void FirstShow() {
                     printf("\n");
                 }
             }
-            for(int i = 0; i < 12; i++) {
+            for(int i = 0; i < 11; i++) {
                 printf("%c",flag);
             }
             printf("%s%s%s", COLOR_WELCOME, wl2, COLOR_RESET);
@@ -50,27 +87,61 @@ void FirstShow() {
         }
         usleep(50000);
     };
-    Shell();
+    Shell(argc, argv);
 }
 
-void Shell() {
+/*
+    shell的主体函数。
+    用command数组存储路径。
+    fork出子进程之后，把在子进程内部执行execve。
+    父进程等待子进程结束之后，继续保持shell状态，并且有Error错误判断。
+*/
+
+void Shell(int argc, char* argv[]) {
     char command[255];
     pid_t pidChild;
-    int count = 0;
-    write(1, "# ", 2);
-    count = read(0, command, 255);
-    command[count - 1] = '\0';
-    switch (pidChild = fork())
-    {
-    case -1:
-        perror("fork");
-        break;
-    
-    case 0:
-        execve(command, 0, 0);
-        break;
-    default:
-        wait(NULL);
-        break;
+    int count = 0, status;
+    while(1) {
+        write(1, "# ", 2);
+        count = read(0, command, 255);
+
+        if(!count) {
+            Error(0);
+            exit(EXIT_SUCCESS);    
+        }
+
+        if(count <= 1) {
+            continue;
+        }
+
+        command[count - 1] = '\0';// 去除之后的\n，让其形成完整路径
+
+        if(strcmp("exit", command) == 0) {
+            Error(0);
+            exit(EXIT_SUCCESS);  
+        }
+
+
+        switch (pidChild = fork())
+        {
+        case -1:
+            perror("fork");
+            break;
+        
+        case 0:
+            extern char* environ[];
+            if(execve(command, argv, environ) == -1) {
+                exit(1);
+            }
+            break;
+        default:
+            wait(&status);
+
+            if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
+                Error(1);
+            }
+            break;
+
+        }
     }
 }
