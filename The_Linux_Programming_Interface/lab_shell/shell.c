@@ -1,4 +1,4 @@
-// 3.1
+// 3.2
 
 // 明天完成路径搜索
 
@@ -11,16 +11,37 @@
 
 #define COLOR_RESET "\033[0m" // 重置 
 #define COLOR_WELCOME "\033[1;34m" // 欢迎界面(粗体蓝色)
+#define MAX_PATH 256
+#define MAX_ARGS 64
 
 void FirstShow(int argc, char* argv[]);
 void Shell(int argc, char* argv[]);
 void Error(int isError);
+int ParseCommand(char* command, char* args[]);// 解析命令行，将token放入参数指针数组
 
 int main(int argc, char* argv[]) {
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
-
     FirstShow(argc, argv);//启动整体程序
     exit(EXIT_SUCCESS);
+}
+
+/*
+    用来解析从用户获取到的命令行，
+    拆分成token放入args参数数组。
+    在while循环内拆分token，并逐个放入数组内。
+*/
+
+int ParseCommand(char* command, char* args[]) {
+    int cnt = 0;
+    char* token = strtok(command, '\t');
+
+    while(cnt <= MAX_ARGS && token != NULL) {
+        args[cnt++] = token;
+        token = strtok(command, '\t');
+    }
+    args[cnt] = NULL;
+
+    return cnt;
 }
 
 /*
@@ -98,6 +119,7 @@ void FirstShow(int argc, char* argv[]) {
 */
 
 void Shell(int argc, char* argv[]) {
+    char *args[MAX_ARGS];
     char command[255];
     pid_t pidChild;
     int count = 0, status;
@@ -121,6 +143,7 @@ void Shell(int argc, char* argv[]) {
             exit(EXIT_SUCCESS);  
         }
 
+        ParseCommand(command, args);// 解析命令行
 
         switch (pidChild = fork())
         {
