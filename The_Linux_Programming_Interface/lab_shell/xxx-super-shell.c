@@ -1,434 +1,412 @@
-﻿#define _GNU_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+﻿// 3.2
+
+// 明天完成路径搜索
+
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <errno.h>
-#include <pwd.h>
-#include <limits.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/wait.h>// 等待子进程
+#include <string.h>// 字符串比较
+#include <signal.h>// 中断 ctrl + c 信号
 
+#define COLOR_RESET "\033[0m" // 重置 
+#define COLOR_WELCOME "\033[1;34m" // 欢迎界面(粗体蓝色)
+#define MAX_PATH 256
+#define MAX_ARGS 64
+#define MAX_BG_PROCESSES 128  // 最大后台进程数
+
+void FirstShow();
+void Shell();
+void Error(int isError);
+int ParseCommand(char* command, char* args[], int* isback);// 解析命令行，将token放入参数指针数组
+char* SearchPath(char* command);// 路径搜索
+void HandleSigChld(int sig);  // SIGCHLD信号处理函数
+void AddBgProcess(pid_t pid, char* command);  // 添加后台进程
+void CheckBgProcesses();  // 检查后台进程状态
+
+// 后台进程结构体
 typedef struct {
-    char **argv;
-    int argc;
-} Cmd;
+    pid_t pid;
+    char command[256];
+    int active;  // 1表示活跃，0表示已结束
+} BgProcess;
 
-typedef struct {
-    Cmd *cmds;
-    int ncmd;
-    char *in_file;
-    char *out_file;
-    int out_append;
-    int background;
-    int valid;
-} Pipeline;
-
-static char *prev_dir = NULL;
-
-static void free_cmd(Cmd *c) {
-    if (!c) return;
-    for (int i = 0; i < c->argc; i++) free(c->argv[i]);
-    free(c->argv);
-    c->argv = NULL;
-    c->argc = 0;
-}
-
-static void free_pipeline(Pipeline *p) {
-    if (!p) return;
-    for (int i = 0; i < p->ncmd; i++) free_cmd(&p->cmds[i]);
-    free(p->cmds);
-    free(p->in_file);
-    free(p->out_file);
-    p->cmds = NULL;
-    p->ncmd = 0;
-    p->in_file = NULL;
-    p->out_file = NULL;
-}
-
-static void trim_newline(char *s) {
-    if (!s) return;
-    size_t n = strlen(s);
-    while (n && (s[n-1] == '\n' || s[n-1] == '\r')) {
-        s[n-1] = 0;
-        n--;
-    }
-}
-
-static int is_special_char(char c) {
-    return c=='|' || c=='<' || c=='>' || c=='&';
-}
-
-static char **tokenize(const char *line, int *outc) {
-    size_t cap = 16;
-    int cnt = 0;
-    char **tokens = malloc(cap * sizeof(char*));
-    const char *p = line;
-    while (*p) {
-        while (*p && (*p==' ' || *p=='\t')) p++;
-        if (!*p) break;
-        if (*p=='\'' || *p=='"') {
-            char quote = *p++;
-            const char *start = p;
-            while (*p && *p != quote) p++;
-            size_t len = p - start;
-            char *tok = malloc(len + 1);
-            memcpy(tok, start, len);
-            tok[len] = 0;
-            if (*p == quote) p++;
-            if (cnt >= (int)cap) { cap*=2; tokens = realloc(tokens, cap*sizeof(char*)); }
-            tokens[cnt++] = tok;
-        } else if (is_special_char(*p)) {
-            if (*p == '>') {
-                if (*(p+1) == '>') {
-                    if (cnt >= (int)cap) { cap*=2; tokens = realloc(tokens, cap*sizeof(char*)); }
-                    tokens[cnt++] = strdup(">>");
-                    p += 2;
-                } else {
-                    if (cnt >= (int)cap) { cap*=2; tokens = realloc(tokens, cap*sizeof(char*)); }
-                    tokens[cnt++] = strdup(">");
-                    p++;
-                }
-            } else {
-                char buf[2] = { *p, 0 };
-                if (cnt >= (int)cap) { cap*=2; tokens = realloc(tokens, cap*sizeof(char*)); }
-                tokens[cnt++] = strdup(buf);
-                p++;
-            }
-        } else {
-            const char *start = p;
-            while (*p && !is_special_char(*p) && *p!=' ' && *p!='\t') p++;
-            size_t len = p - start;
-            char *tok = malloc(len + 1);
-            memcpy(tok, start, len);
-            tok[len] = 0;
-            if (cnt >= (int)cap) { cap*=2; tokens = realloc(tokens, cap*sizeof(char*)); }
-            tokens[cnt++] = tok;
-        }
-    }
-    if (outc) *outc = cnt;
-    return tokens;
-}
-
-static void free_tokens(char **toks, int n) {
-    for (int i = 0; i < n; i++) free(toks[i]);
-    free(toks);
-}
-
-static Pipeline parse_pipeline(char **toks, int n) {
-    Pipeline p = {0};
-    p.valid = 0;
-    if (n == 0) { p.valid = 0; return p; }
-    if (n > 0 && strcmp(toks[n-1], "&")==0) {
-        p.background = 1;
-        n -= 1;
-    }
-    if (n == 0) { p.valid = 0; return p; }
-    int segs = 1;
-    for (int i = 0; i < n; i++) if (strcmp(toks[i],"|")==0) segs++;
-    p.cmds = calloc(segs, sizeof(Cmd));
-    p.ncmd = segs;
-    int seg_idx = 0;
-    size_t cap = 8;
-    p.cmds[0].argv = malloc(cap * sizeof(char*));
-    p.cmds[0].argc = 0;
-    for (int i = 0; i < n; i++) {
-        if (strcmp(toks[i],"|")==0) {
-            p.cmds[seg_idx].argv = realloc(p.cmds[seg_idx].argv, (p.cmds[seg_idx].argc+1)*sizeof(char*));
-            p.cmds[seg_idx].argv[p.cmds[seg_idx].argc] = NULL;
-            seg_idx++;
-            cap = 8;
-            p.cmds[seg_idx].argv = malloc(cap*sizeof(char*));
-            p.cmds[seg_idx].argc = 0;
-        } else {
-            if (p.cmds[seg_idx].argc >= (int)cap) { cap*=2; p.cmds[seg_idx].argv = realloc(p.cmds[seg_idx].argv, cap*sizeof(char*)); }
-            p.cmds[seg_idx].argv[p.cmds[seg_idx].argc++] = strdup(toks[i]);
-        }
-    }
-    p.cmds[seg_idx].argv = realloc(p.cmds[seg_idx].argv, (p.cmds[seg_idx].argc+1)*sizeof(char*));
-    p.cmds[seg_idx].argv[p.cmds[seg_idx].argc] = NULL;
-    for (int i = 0; i < p.ncmd; i++) if (p.cmds[i].argc==0) { p.valid = 0; return p; }
-    for (int i = 0; i < p.cmds[0].argc; i++) {
-        if (strcmp(p.cmds[0].argv[i], "<")==0) {
-            if (i+1 >= p.cmds[0].argc) { p.valid = 0; return p; }
-            free(p.in_file);
-            p.in_file = strdup(p.cmds[0].argv[i+1]);
-            free(p.cmds[0].argv[i]);
-            free(p.cmds[0].argv[i+1]);
-            for (int j = i; j+2 <= p.cmds[0].argc; j++) p.cmds[0].argv[j] = p.cmds[0].argv[j+2];
-            p.cmds[0].argc -= 2;
-            p.cmds[0].argv[p.cmds[0].argc] = NULL;
-            i--;
-        } else if (strcmp(p.cmds[0].argv[i], ">")==0 || strcmp(p.cmds[0].argv[i], ">>")==0) {
-            p.valid = 0;
-            return p;
-        }
-    }
-    for (int i = 0; i < p.cmds[p.ncmd-1].argc; i++) {
-        if (strcmp(p.cmds[p.ncmd-1].argv[i], ">")==0 || strcmp(p.cmds[p.ncmd-1].argv[i], ">>")==0) {
-            if (i+1 >= p.cmds[p.ncmd-1].argc) { p.valid = 0; return p; }
-            p.out_append = strcmp(p.cmds[p.ncmd-1].argv[i], ">>")==0;
-            free(p.out_file);
-            p.out_file = strdup(p.cmds[p.ncmd-1].argv[i+1]);
-            free(p.cmds[p.ncmd-1].argv[i]);
-            free(p.cmds[p.ncmd-1].argv[i+1]);
-            for (int j = i; j+2 <= p.cmds[p.ncmd-1].argc; j++) p.cmds[p.ncmd-1].argv[j] = p.cmds[p.ncmd-1].argv[j+2];
-            p.cmds[p.ncmd-1].argc -= 2;
-            p.cmds[p.ncmd-1].argv[p.cmds[p.ncmd-1].argc] = NULL;
-            i--;
-        } else if (strcmp(p.cmds[p.ncmd-1].argv[i], "<")==0) {
-            p.valid = 0;
-            return p;
-        }
-    }
-    for (int s = 1; s < p.ncmd-1; s++) {
-        for (int i = 0; i < p.cmds[s].argc; i++) {
-            if (strcmp(p.cmds[s].argv[i], "<")==0 || strcmp(p.cmds[s].argv[i], ">")==0 || strcmp(p.cmds[s].argv[i], ">>")==0) {
-                p.valid = 0;
-                return p;
-            }
-        }
-    }
-    p.valid = 1;
-    return p;
-}
-
-static void print_prompt() {
-    char host[256] = {0};
-    gethostname(host, sizeof(host)-1);
-    const char *user = getenv("USER");
-    if (!user) {
-        struct passwd *pw = getpwuid(getuid());
-        if (pw && pw->pw_name) user = pw->pw_name;
-        else user = "user";
-    }
-    char cwd[PATH_MAX];
-    if (!getcwd(cwd, sizeof(cwd))) strcpy(cwd, "?");
-    const char *home = getenv("HOME");
-    char shown[PATH_MAX];
-    if (home && strncmp(cwd, home, strlen(home))==0) {
-        snprintf(shown, sizeof(shown), "~%s", cwd+strlen(home));
-    } else {
-        snprintf(shown, sizeof(shown), "%s", cwd);
-    }
-    printf("%s@%s %s $ ", user, host[0]?host:"host", shown);
-    fflush(stdout);
-}
-
-static int builtin_cd(Cmd *c) {
-    if (c->argc < 2) {
-        const char *home = getenv("HOME");
-        if (!home) return -1;
-        char *cur = getcwd(NULL, 0);
-        int r = chdir(home);
-        if (r==0) {
-            free(prev_dir);
-            prev_dir = cur;
-        } else {
-            free(cur);
-        }
-        return r;
-    }
-    if (strcmp(c->argv[1], "-")==0) {
-        if (!prev_dir) return -1;
-        char *cur = getcwd(NULL, 0);
-        int r = chdir(prev_dir);
-        if (r==0) {
-            free(prev_dir);
-            prev_dir = cur;
-            printf("%s\n", prev_dir);
-        } else {
-            free(cur);
-        }
-        return r;
-    } else {
-        char *cur = getcwd(NULL, 0);
-        int r = chdir(c->argv[1]);
-        if (r==0) {
-            free(prev_dir);
-            prev_dir = cur;
-        } else {
-            free(cur);
-        }
-        return r;
-    }
-}
-
-static int is_builtin(Cmd *c) {
-    if (c->argc==0) return 0;
-    if (strcmp(c->argv[0], "cd")==0) return 1;
-    if (strcmp(c->argv[0], "exit")==0) return 2;
-    return 0;
-}
-
-static void restore_default_signals() {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = SIG_DFL;
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGQUIT, &sa, NULL);
-}
-
-static void ignore_shell_signals() {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = SIG_IGN;
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGQUIT, &sa, NULL);
-}
-
-static void reap_children() {
-    int status;
-    while (waitpid(-1, &status, WNOHANG) > 0) {}
-}
-
-static int run_pipeline(Pipeline *p) {
-    if (!p->valid) {
-        fprintf(stderr, "syntax error\n");
-        return 1;
-    }
-    if (p->ncmd==1) {
-        int b = is_builtin(&p->cmds[0]);
-        if (b==1) {
-            if (p->in_file || p->out_file) {
-                fprintf(stderr, "redirection not supported for builtin\n");
-                return 1;
-            }
-            int r = builtin_cd(&p->cmds[0]);
-            if (r!=0) perror("cd");
-            return r!=0;
-        } else if (b==2) {
-            exit(0);
-        }
-    }
-    int n = p->ncmd;
-    int (*pipes)[2] = NULL;
-    if (n>1) {
-        pipes = calloc(n-1, sizeof(int[2]));
-        for (int i = 0; i < n-1; i++) {
-            if (pipe(pipes[i]) < 0) {
-                perror("pipe");
-                for (int k=0;k<i;k++){close(pipes[k][0]);close(pipes[k][1]);}
-                free(pipes);
-                return 1;
-            }
-        }
-    }
-    pid_t *pids = calloc(n, sizeof(pid_t));
-    for (int i = 0; i < n; i++) {
-        pid_t pid = fork();
-        if (pid < 0) {
-            perror("fork");
-            for (int k=0;k<n-1;k++){ if (pipes){close(pipes[k][0]);close(pipes[k][1]);} }
-            free(pipes);
-            free(pids);
-            return 1;
-        }
-        if (pid == 0) {
-            restore_default_signals();
-            if (i==0 && p->in_file) {
-                int fd = open(p->in_file, O_RDONLY);
-                if (fd < 0) { perror("open"); _exit(1); }
-                if (dup2(fd, STDIN_FILENO) < 0) { perror("dup2"); _exit(1); }
-                close(fd);
-            }
-            if (i>0) {
-                if (dup2(pipes[i-1][0], STDIN_FILENO) < 0) { perror("dup2"); _exit(1); }
-            }
-            if (i < n-1) {
-                if (dup2(pipes[i][1], STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
-            } else {
-                if (p->out_file) {
-                    int flags = O_WRONLY | O_CREAT | (p->out_append ? O_APPEND : O_TRUNC);
-                    int fd = open(p->out_file, flags, 0666);
-                    if (fd < 0) { perror("open"); _exit(1); }
-                    if (dup2(fd, STDOUT_FILENO) < 0) { perror("dup2"); _exit(1); }
-                    close(fd);
-                }
-            }
-            if (pipes) {
-                for (int k = 0; k < n-1; k++) {
-                    close(pipes[k][0]);
-                    close(pipes[k][1]);
-                }
-            }
-            int b = is_builtin(&p->cmds[i]);
-            if (b==1) {
-                int r = builtin_cd(&p->cmds[i]);
-                if (r!=0) perror("cd");
-                _exit(r!=0);
-            } else if (b==2) {
-                _exit(0);
-            }
-            execvp(p->cmds[i].argv[0], p->cmds[i].argv);
-            perror("execvp");
-            _exit(127);
-        } else {
-            pids[i] = pid;
-        }
-    }
-    if (pipes) {
-        for (int k = 0; k < n-1; k++) {
-            close(pipes[k][0]);
-            close(pipes[k][1]);
-        }
-    }
-    free(pipes);
-    int status = 0;
-    if (p->background) {
-        printf("[bg] %d\n", pids[n-1]);
-    } else {
-        for (int i = 0; i < n; i++) {
-            int st;
-            if (waitpid(pids[i], &st, 0) > 0) status = st;
-        }
-    }
-    free(pids);
-    return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-}
+BgProcess bg_processes[MAX_BG_PROCESSES];
+int bg_count = 0;
 
 int main() {
-    ignore_shell_signals();
-    char *line = NULL;
-    size_t cap = 0;
-    prev_dir = getcwd(NULL, 0);
-    while (1) {
-        reap_children();
-        print_prompt();
-        ssize_t m = getline(&line, &cap, stdin);
-        if (m < 0) break;
-        trim_newline(line);
-        if (line[0]==0) continue;
-        int nt = 0;
-        char **toks = tokenize(line, &nt);
-        if (nt==0) { free_tokens(toks, nt); continue; }
-        Pipeline p = parse_pipeline(toks, nt);
-        free_tokens(toks, nt);
-        if (!p.valid) {
-            fprintf(stderr, "invalid command\n");
-            free_pipeline(&p);
-            continue;
-        }
-        if (p.ncmd==1) {
-            int b = is_builtin(&p.cmds[0]);
-            if (b==1) {
-                int r = builtin_cd(&p.cmds[0]);
-                if (r!=0) perror("cd");
-                free_pipeline(&p);
-                continue;
-            } else if (b==2) {
-                free_pipeline(&p);
+    signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
+    signal(SIGCHLD, HandleSigChld);  // 处理子进程退出信号
+    
+    // 设置stdin为行缓冲
+    setvbuf(stdin, NULL, _IOLBF, 0);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    
+    FirstShow();//启动整体程序
+    exit(EXIT_SUCCESS);
+}
+
+/*
+    SIGCHLD信号处理函数
+    避免僵尸进程，并记录后台进程结束
+*/
+void HandleSigChld(int sig) {
+    int status;
+    pid_t pid;
+    
+    // 使用WNOHANG非阻塞地回收所有已结束的子进程
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        // 标记后台进程为已结束
+        for (int i = 0; i < bg_count; i++) {
+            if (bg_processes[i].pid == pid && bg_processes[i].active) {
+                bg_processes[i].active = 0;  // 标记为已结束
+                printf("\n[%d] + 完成\t%s\n", pid, bg_processes[i].command);
+                printf("#  ");  // 重新显示提示符
+                fflush(stdout);
                 break;
             }
         }
-        run_pipeline(&p);
-        free_pipeline(&p);
     }
-    free(prev_dir);
-    free(line);
-    return 0;
 }
 
+/*
+    添加后台进程到列表
+*/
+void AddBgProcess(pid_t pid, char* command) {
+    if (bg_count < MAX_BG_PROCESSES) {
+        bg_processes[bg_count].pid = pid;
+        strncpy(bg_processes[bg_count].command, command, 255);
+        bg_processes[bg_count].command[255] = '\0';
+        bg_processes[bg_count].active = 1;
+        printf("[%d] %d\n", bg_count + 1, pid);  // 打印作业号和进程ID
+        bg_count++;
+    }
+}
+
+/*
+    检查后台进程状态并清理
+*/
+void CheckBgProcesses() {
+    int i = 0;
+    while (i < bg_count) {
+        if (!bg_processes[i].active) {
+            // 移除已结束的进程
+            for (int j = i; j < bg_count - 1; j++) {
+                bg_processes[j] = bg_processes[j + 1];
+            }
+            bg_count--;
+        } else {
+            i++;
+        }
+    }
+}
+
+/*
+    用来进行路径搜索。
+    先获取到原本路径，
+    后对原本路径复制，用复制样本进行拆分，
+    把每个目录放成完整路径。
+    如果绝对路径正确，则返回绝对路径，
+    否则从环境变量里找到并返回完整路径。
+    如果什么都没找到，返回NULL。
+*/
+
+char* SearchPath(char* command) {
+    // 处理空命令
+    if (command == NULL || *command == '\0') {
+        return NULL;
+    }
+    
+    // 如果命令包含空格，需要特殊处理
+    // 但这里我们只处理第一个参数（程序名）
+    
+    char* path = getenv("PATH");
+    if (path == NULL) {
+        return NULL;
+    }
+    
+    char *pathcopy = strdup(path); 
+    char* dir = strtok(pathcopy, ":");
+    static char fullpath[MAX_PATH];
+
+    if(command[0] == '/' || command[0] == '.') {
+        if(access(command, X_OK) == 0) {// 绝对路径直接返回command
+            free(pathcopy);
+            return command;
+        }
+        free(pathcopy);
+        return NULL;
+    }
+
+    while(dir) {
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, command);
+
+        if(access(fullpath, X_OK) == 0) {// 非绝对路径返回完整路径
+            free(pathcopy);
+            return fullpath;
+        }
+
+        dir = strtok(NULL, ":");
+    }
+    free(pathcopy);
+    return NULL;
+}
+
+/*
+    用来解析从用户获取到的命令行，
+    拆分成token放入args参数数组。
+    在while循环内拆分token，并逐个放入数组内。
+    修改：正确处理空格分隔的参数
+*/
+
+int ParseCommand(char* command, char* args[], int* isback) {
+    int cnt = 0;
+    int len = strlen(command);
+    
+    *isback = 0;
+    
+    // 去除开头和结尾的空格
+    char* start = command;
+    while (*start == ' ' || *start == '\t') start++;
+    
+    char* end = command + len - 1;
+    while (end > start && (*end == ' ' || *end == '\t' || *end == '\n')) {
+        *end = '\0';
+        end--;
+    }
+    
+    // 检查末尾是否有&
+    if (end >= start && *end == '&') {
+        *isback = 1;
+        *end = '\0';  // 移除&
+        
+        // 再去除&之前的空格
+        end--;
+        while (end >= start && (*end == ' ' || *end == '\t')) {
+            *end = '\0';
+            end--;
+        }
+    }
+    
+    // 如果命令为空，返回
+    if (*start == '\0') {
+        args[0] = NULL;
+        return 0;
+    }
+    
+    // 使用空格和制表符作为分隔符
+    char* token = strtok(start, " \t");
+    
+    while(cnt < MAX_ARGS - 1 && token != NULL) {
+        args[cnt++] = token;
+        token = strtok(NULL, " \t");
+    }
+    args[cnt] = NULL;
+    
+    return cnt;
+}
+
+/*
+    用来判断用户可能出现的错误。
+    用isError存储错误参数，
+    函数接受参数后执行对应错误码，给用户提示。
+*/
+
+void Error(int isError) {
+    switch (isError) 
+    {
+    case 0:// 退出shell
+        printf("\n退出shell\n");
+        break;
+
+    case 1:// 路径错误
+        printf("找不到该路径，也可能路径输入错误，请重试...\n");
+        break;
+    
+    default:
+        break;
+    }
+}
+
+/*
+    shell进入的欢迎界面。
+    用了2个字符串指针，之后在两层for循环中，打印界面。
+    最后执行shell函数，进入shell内部。
+*/
+
+void FirstShow() {
+    int time;
+    char flag = '#';
+    char* wl = "Welcome";
+    char* wl2 = "Shell";
+    
+    printf("\n");  // 先空一行
+    
+    for(time = 1; time <= 10; time++) {
+        for(int i = 0; i < 30; i++) {
+            printf("%c", flag);
+        }
+        printf("\n");
+        
+        if(time == 5) {  // 10/2 = 5
+            // 打印第一行 "Welcome"
+            for(int i = 0; i < 10; i++) {
+                printf("%c", flag);
+            }
+            printf("%s%s%s", COLOR_WELCOME, wl, COLOR_RESET);
+            for(int i = 0; i < 13; i++) {
+                printf("%c", flag);
+            }
+            printf("\n");
+            
+            // 打印第二行 "Shell"
+            for(int i = 0; i < 11; i++) {
+                printf("%c", flag);
+            }
+            printf("%s%s%s", COLOR_WELCOME, wl2, COLOR_RESET);
+            for(int i = 0; i < 14; i++) {
+                printf("%c", flag);
+            }
+            printf("\n");
+        }
+        
+        usleep(50000);
+    }
+    
+    printf("\n");  // 再空一行
+    Shell();
+}
+
+/*
+    shell的主体函数。
+    用command数组存储路径。
+    fork出子进程之后，把在子进程内部执行execve。
+    父进程等待子进程结束之后，继续保持shell状态，并且有Error错误判断。
+*/
+
+void Shell() {
+    char *args[MAX_ARGS];
+    char command[256];  // 增加大小以容纳完整命令
+    char command_copy[256];  // 用于保存原始命令（显示用）
+    char* execpath = NULL;
+    pid_t pidChild;
+    int status, isback = 0;
+    
+    while(1) {
+        CheckBgProcesses();  // 清理已结束的后台进程
+        
+        printf("#  ");  // 使用printf替代write
+        fflush(stdout);  // 确保提示符立即显示
+        
+        // 使用fgets读取命令
+        if (fgets(command, sizeof(command), stdin) == NULL) {
+            if (feof(stdin)) {  // 检查是否是EOF
+                printf("\n");
+                Error(0);
+                exit(EXIT_SUCCESS);
+            }
+            continue;
+        }
+        
+        // 保存命令副本用于显示
+        strncpy(command_copy, command, sizeof(command_copy) - 1);
+        command_copy[sizeof(command_copy) - 1] = '\0';
+        
+        // 移除末尾的换行符
+        size_t len = strlen(command);
+        if (len > 0 && command[len - 1] == '\n') {
+            command[len - 1] = '\0';
+            len--;
+        }
+        
+        // 跳过空命令
+        if (len == 0) {
+            continue;
+        }
+
+        // 处理退出命令
+        if (strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {
+            // 退出前检查是否有后台进程
+            if (bg_count > 0) {
+                printf("还有 %d 个后台进程在运行，确定退出？(y/n): ", bg_count);
+                char answer[10];
+                if (fgets(answer, sizeof(answer), stdin) != NULL) {
+                    if (answer[0] != 'y' && answer[0] != 'Y') {
+                        continue;  // 不退出，继续shell
+                    }
+                }
+            }
+            Error(0);
+            exit(EXIT_SUCCESS);
+        }
+
+        // 添加jobs命令，显示后台任务
+        if (strcmp("jobs", command) == 0) {
+            if (bg_count == 0) {
+                printf("没有后台进程\n");
+            } else {
+                printf("后台进程列表：\n");
+                for (int i = 0; i < bg_count; i++) {
+                    printf("[%d] %d\t%s\t%s\n", 
+                           i + 1, 
+                           bg_processes[i].pid, 
+                           bg_processes[i].active ? "运行中" : "已完成",
+                           bg_processes[i].command);
+                }
+            }
+            continue;
+        }
+
+        // 解析命令
+        int arg_count = ParseCommand(command, args, &isback);
+
+        if (arg_count == 0 || args[0] == NULL) {
+            continue;  // 空命令
+        }
+
+        // 调试信息（可以注释掉）
+        // printf("执行命令: %s\n", args[0]);
+        
+        execpath = SearchPath(args[0]);
+        
+        if(!execpath) {
+            Error(1);
+            continue;
+        }
+
+        switch (pidChild = fork())
+        {
+        case -1:
+            perror("fork");
+            break;
+        
+        case 0:  // 子进程
+            // 如果是后台进程，忽略终端信号
+            if (isback) {
+                signal(SIGINT, SIG_IGN);
+                signal(SIGQUIT, SIG_IGN);
+            }
+            
+            extern char* environ[];
+            if(execve(execpath, args, environ) == -1) {
+                perror("execve");
+                exit(1);
+            }
+            break;
+            
+        default:  // 父进程
+            if (isback) {
+                // 后台运行：不等待，记录进程
+                AddBgProcess(pidChild, command_copy);
+            } else {
+                // 前台运行：等待子进程结束
+                waitpid(pidChild, &status, 0);
+                
+                if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
+                    Error(1);
+                }
+            }
+            break;
+        }
+    }
+}

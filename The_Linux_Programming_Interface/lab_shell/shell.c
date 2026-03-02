@@ -1,6 +1,6 @@
-// 3.2
+// 3.2已完成路径搜索
 
-// 明天完成路径搜索
+// 明天完成后台运行
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -14,15 +14,55 @@
 #define MAX_PATH 256
 #define MAX_ARGS 64
 
-void FirstShow(int argc, char* argv[]);
-void Shell(int argc, char* argv[]);
+void FirstShow();
+void Shell();
 void Error(int isError);
-int ParseCommand(char* command, char* args[]);// 解析命令行，将token放入参数指针数组
+int ParseCommand(char* command, char* args[], int* isback);// 解析命令行，将token放入参数指针数组
+char* SearchPath(char* command);// 路径搜索
 
-int main(int argc, char* argv[]) {
+int main() {
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
-    FirstShow(argc, argv);//启动整体程序
+    FirstShow();//启动整体程序
     exit(EXIT_SUCCESS);
+}
+
+/*
+    用来进行路径搜索。
+    先获取到原本路径，
+    后对原本路径复制，用复制样本进行拆分，
+    把每个目录放成完整路径。
+    如果绝对路径正确，则返回绝对路径，
+    否则从环境变量里找到并返回完整路径。
+    如果什么都没找到，返回NULL。
+*/
+
+char* SearchPath(char* command) {
+    char* path = getenv("PATH");
+    char *pathcopy = strdup(path); 
+    char* dir = strtok(pathcopy, ":");
+    static char fullpath[MAX_PATH];
+
+    if(command[0] == '/' || command[0] == '.') {
+        if(access(command, X_OK) == 0) {// 绝对路径直接返回command
+            free(pathcopy);
+            return command;
+        }
+        free(pathcopy);
+        return NULL;
+    }
+
+    while(dir) {
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, command);
+
+        if(access(fullpath, X_OK) == 0) {// 非绝对路径返回完整路径
+            free(pathcopy);
+            return fullpath;
+        }
+
+        dir = strtok(NULL, ":");
+    }
+    free(pathcopy);
+    return NULL;
 }
 
 /*
@@ -31,13 +71,24 @@ int main(int argc, char* argv[]) {
     在while循环内拆分token，并逐个放入数组内。
 */
 
-int ParseCommand(char* command, char* args[]) {
-    int cnt = 0;
-    char* token = strtok(command, '\t');
+int ParseCommand(char* command, char* args[], int* isback) {
+    int cnt = 0, len = strlen(command);
+    
+    *isback = 0;
+    if(len > 0 && command[len - 1] == '&') {
+        *isback = 1;
+        command[len - 1] = '\0';
+        
+        while(len > 1 && command[len - 2] == ' ') {
+            command[len-- - 2] = '\0';
+        }
+    }
+
+    char* token = strtok(command, "\t");
 
     while(cnt <= MAX_ARGS && token != NULL) {
         args[cnt++] = token;
-        token = strtok(command, '\t');
+        token = strtok(NULL, "\t");
     }
     args[cnt] = NULL;
 
@@ -54,11 +105,11 @@ void Error(int isError) {
     switch (isError) 
     {
     case 0:// 退出shell
-        printf("退出shell\n");
+        printf("\n退出shell\n");
         break;
 
     case 1:// 路径错误
-        printf("找不到该路径，也可能路径输入错误，请重试...\n");
+        printf("\n找不到该路径，也可能路径输入错误，请重试...\n");
         break;
     
     default:
@@ -72,7 +123,7 @@ void Error(int isError) {
     最后执行shell函数，进入shell内部。
 */
 
-void FirstShow(int argc, char* argv[]) {
+void FirstShow() {
     int time;
     char ch, flag = '#';
     char* wl = "Welcome";
@@ -108,7 +159,7 @@ void FirstShow(int argc, char* argv[]) {
         }
         usleep(50000);
     };
-    Shell(argc, argv);
+    Shell();
 }
 
 /*
@@ -118,13 +169,14 @@ void FirstShow(int argc, char* argv[]) {
     父进程等待子进程结束之后，继续保持shell状态，并且有Error错误判断。
 */
 
-void Shell(int argc, char* argv[]) {
+void Shell() {
     char *args[MAX_ARGS];
     char command[255];
+    char* execpath = NULL;
     pid_t pidChild;
-    int count = 0, status;
+    int count = 0, status, isback = 0;
     while(1) {
-        write(1, "# ", 2);
+        write(1, "#  ", 3);
         count = read(0, command, 255);
 
         if(!count) {
@@ -140,10 +192,17 @@ void Shell(int argc, char* argv[]) {
 
         if(strcmp("exit", command) == 0) {
             Error(0);
-            exit(EXIT_SUCCESS);  
+            exit(EXIT_SUCCESS); 
         }
 
-        ParseCommand(command, args);// 解析命令行
+        ParseCommand(command, args, &isback);// 解析命令行
+
+        execpath = SearchPath(args[0]);
+        
+        if(!execpath) {
+            Error(1);
+            continue;
+        }
 
         switch (pidChild = fork())
         {
@@ -153,18 +212,21 @@ void Shell(int argc, char* argv[]) {
         
         case 0:
             extern char* environ[];
-            if(execve(command, argv, environ) == -1) {
+            if(execve(execpath, args, environ) == -1) {
                 exit(1);
             }
             break;
         default:
-            wait(&status);
+            if(!isback) {
+                wait(&status);
 
-            if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
-                Error(1);
+                if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
+                    Error(1);
+                }
+            }else {
+                printf("\nshell: finished.\n");
             }
             break;
-
         }
     }
 }
