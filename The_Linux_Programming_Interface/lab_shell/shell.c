@@ -218,7 +218,7 @@ void Shell() {
             }
             break;
         default:
-            if(!isback) {
+            if(!isback) {// 这想弄成后台运行，但是没那么简单，故搁置
                 wait(&status);
 
                 if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
