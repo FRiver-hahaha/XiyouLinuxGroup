@@ -176,7 +176,8 @@ void Shell() {
     pid_t pidChild;
     int count = 0, status, isback = 0;
     while(1) {
-        write(1, "#  ", 3);
+        printf("#  ");
+        fflush(stdout);
         count = read(0, command, 255);
 
         if(!count) {
