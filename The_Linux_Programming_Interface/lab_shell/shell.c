@@ -1,6 +1,6 @@
-// 3.2已完成路径搜索
+// 3.3已完成后台进程&
 
-// 明天完成后台运行
+// 明天完成cd
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -13,18 +13,106 @@
 #define COLOR_WELCOME "\033[1;34m" // 欢迎界面(粗体蓝色)
 #define MAX_PATH 256
 #define MAX_ARGS 64
+#define MAX_BGPROCESS 128
+
+
+typedef struct {
+    pid_t pid;
+    char command[256];
+    int isstillhere;
+}Bgprocess;
+
+Bgprocess bgProcess[MAX_BGPROCESS];// 后台进程
+int bgpCount = 0;// 后台进程数
+
 
 void FirstShow();
 void Shell();
 void Error(int isError);
 int ParseCommand(char* command, char* args[], int* isback);// 解析命令行，将token放入参数指针数组
 char* SearchPath(char* command);// 路径搜索
+void SignalZombie(int sig);  // 处理僵尸进程
+void AddBgProcess(pid_t pid, char* command);// 添加后台进程
+void CheckBgProcess(void);// 检查后台进程
 
 int main() {
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
+    signal(SIGCHLD, SignalZombie);// 处理僵尸进程
+
+    setvbuf(stdin, NULL, _IOLBF, 0);// 处理行缓冲，使得快速显示内容
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     FirstShow();//启动整体程序
     exit(EXIT_SUCCESS);
 }
+
+/*
+    用来移除已经结束的进程。
+    在while循环内作为检查的起始端。
+    在for循环中利用冒泡排序，
+    依次将整体移动，清除0位。
+    如果碰到了正在运行的进程则跳过，i++
+    否则进行for循环，并且减少bgpCount。
+*/
+
+void CheckBgProcess() {
+    int i = 0;
+    while(i < bgpCount) {
+        if(!bgProcess[i].isstillhere) {
+            for(int j = i; j < bgpCount - 1; j++) {
+                bgProcess[j] = bgProcess[j + 1];
+            }
+            bgpCount--;
+        }else {
+            i++;
+        }
+    }
+}
+
+/*
+    用来添加后台进程到后台进程结构体数组内。
+    如果当前后台进程数少于最大进程数，
+    则创建好后台进程，
+    并打印好创建信息。
+*/
+
+void AddBgProcess(pid_t pid, char* command) {
+    if(bgpCount < MAX_BGPROCESS) {
+        bgProcess[bgpCount].pid = pid;
+        bgProcess[bgpCount].isstillhere = 1;
+        memcpy(bgProcess[bgpCount].command, command, 255);
+        bgProcess[bgpCount].command[255] = '\0';
+
+        printf("[ %d ] %d\n", ++bgpCount, pid);// 打印后台进程数目，进程pid
+    }
+}
+
+/*
+    用来处理僵尸进程。
+    获取到当前进程的状态和pid，
+    在while循环内通过wait no hang(不挂起等待)的方式，
+    回收每个僵尸进程，
+    设置好回收状态。
+    并且提示给用户进程的回收状态。
+*/
+
+void SignalZombie(int sig) {
+    int status;
+    pid_t currentPid;
+
+    while((currentPid = waitpid(-1, &status, WNOHANG)) > 0) {
+        for(int i = 0; i < bgpCount; ++i) {
+            if(bgProcess[i].pid == currentPid && bgProcess[i].isstillhere) {
+                bgProcess[i].isstillhere = 0;// 设置为已回收
+                printf("\n[ %d ] %s 进程已回收\n", currentPid, bgProcess[i].command);
+                printf("# ");
+                fflush(stdout);
+                break;
+            }
+        }
+    }
+}
+
 
 /*
     用来进行路径搜索。
@@ -37,6 +125,12 @@ int main() {
 */
 
 char* SearchPath(char* command) {
+
+    if(!command || *command == '\0') {
+        return NULL;
+    }
+
+
     char* path = getenv("PATH");
     char *pathcopy = strdup(path); 
     char* dir = strtok(pathcopy, ":");
@@ -75,20 +169,40 @@ int ParseCommand(char* command, char* args[], int* isback) {
     int cnt = 0, len = strlen(command);
     
     *isback = 0;
-    if(len > 0 && command[len - 1] == '&') {
-        *isback = 1;
-        command[len - 1] = '\0';
-        
-        while(len > 1 && command[len - 2] == ' ') {
-            command[len-- - 2] = '\0';
-        }
+
+
+    // 处理冗余内容
+    char* start = command;
+    while(*start == ' ' || *start == '\t') start++;
+
+    char* end = command + len - 1;
+    while(end > start && (*end == ' ' || *end == '\t' || *end == '\n')) {
+        *end = '\0';
+        end--;
     }
 
-    char* token = strtok(command, "\t");
+    if(end >= start && *end == '&') {
+        *isback = 1;
+        *end = '\0';
+
+        end--;
+        while(end >= start && (*end == ' ' || *end == '\t')) {
+            *end = '\0';
+            end--;
+        }
+    }
+    // 处理冗余内容
+
+    if(*start == '\0') {
+        args[0] = NULL;
+        return 0;
+    }
+
+    char* token = strtok(start, " \t");
 
     while(cnt <= MAX_ARGS && token != NULL) {
         args[cnt++] = token;
-        token = strtok(NULL, "\t");
+        token = strtok(NULL, " \t");
     }
     args[cnt] = NULL;
 
@@ -125,7 +239,7 @@ void Error(int isError) {
 
 void FirstShow() {
     int time;
-    char ch, flag = '#';
+    char flag = '#';
     char* wl = "Welcome";
     char* wl2 = "Shell";
     for(time = 1; time <= 10; time++) {
@@ -171,29 +285,63 @@ void FirstShow() {
 
 void Shell() {
     char *args[MAX_ARGS];
-    char command[255];
+
+    char command[256];
+    char commandShow[256];
+    char answer[10];
     char* execpath = NULL;
     pid_t pidChild;
-    int count = 0, status, isback = 0;
+    int status, isback = 0;
     while(1) {
-        printf("#  ");
+        CheckBgProcess();
+        printf("# ");
         fflush(stdout);
-        count = read(0, command, 255);
-
-        if(!count) {
-            Error(0);
-            exit(EXIT_SUCCESS);    
-        }
-
-        if(count <= 1) {
+        if(!fgets(command, 256, stdin)) {// 输入命令
+            if(feof(stdin)) {// 如果遇到eof(ctrl + D)
+                printf("\n");
+                Error(0);
+                exit(EXIT_SUCCESS);
+            }
             continue;
         }
 
-        command[count - 1] = '\0';// 去除之后的\n，让其形成完整路径
+        strncpy(commandShow, command, 255);
+        commandShow[255] = '\0';
 
-        if(strcmp("exit", command) == 0) {
+        size_t len = strlen(command);
+        if (len > 0 && command[len - 1] == '\n') {
+            command[len - 1] = '\0';
+            len--;
+        }
+
+        if(strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {// 处理退出
+            if(bgpCount > 0) {
+                printf("当前后台还有 %d 个进程正在运行，是否要强行关闭? (y/n): ", bgpCount);
+                if(fgets(answer, sizeof(answer), stdin)) {
+                    if(answer[0] != 'y' && answer[0] != 'Y') {
+                        continue;
+                    }
+                }
+            }
             Error(0);
             exit(EXIT_SUCCESS); 
+        }
+
+        // 添加jobs命令，显示后台任务
+        if (strcmp("jobs", command) == 0) {
+            if (bgpCount == 0) {
+                printf("没有后台进程\n");
+            } else {
+                printf("后台进程列表：\n");
+                for (int i = 0; i < bgpCount; i++) {
+                    printf("[%d] %d\t%s\t%s\n", 
+                           i + 1, 
+                           bgProcess[i].pid, 
+                           bgProcess[i].isstillhere ? "运行中" : "已完成",
+                           bgProcess[i].command);
+                }
+            }
+            continue;
         }
 
         ParseCommand(command, args, &isback);// 解析命令行
@@ -212,22 +360,29 @@ void Shell() {
             break;
         
         case 0:
+            // 如果是后台进程，忽略终端信号
+            if (isback) {
+                signal(SIGINT, SIG_IGN);
+                signal(SIGQUIT, SIG_IGN);
+            }
             extern char* environ[];
             if(execve(execpath, args, environ) == -1) {
                 exit(1);
             }
             break;
         default:
-            if(!isback) {// 这想弄成后台运行，但是没那么简单，故搁置
-                wait(&status);
+            if(isback) {
+                AddBgProcess(pidChild, command);
+            }else {
+                waitpid(pidChild, &status, 0);
 
                 if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
                     Error(1);
                 }
-            }else {
-                printf("\nshell: finished.\n");
             }
             break;
         }
     }
+    free(command);
+    free(commandShow);
 }
