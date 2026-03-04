@@ -286,87 +286,127 @@ void FirstShow() {
 
 void Shell() {
     char *args[MAX_ARGS];
-    char command[256];  // 增加大小以容纳完整命令
-    char command_copy[256];  // 用于保存原始命令（显示用）
+    char command[256];
+    char answer[10];
     char* execpath = NULL;
     pid_t pidChild;
     int status, isback = 0;
+    char current_path[MAX_PATH];  // 用于存储当前路径
     
     while(1) {
-        CheckBgProcesses();  // 清理已结束的后台进程
+        CheckBgProcess();
         
-        printf("#  ");  // 使用printf替代write
-        fflush(stdout);  // 确保提示符立即显示
+        // 获取并显示当前工作目录
+        if (getcwd(current_path, sizeof(current_path)) != NULL) {
+            printf("%s# ", current_path);  // 显示当前路径
+        } else {
+            printf("# ");
+        }
+        fflush(stdout);
         
-        // 使用fgets读取命令
-        if (fgets(command, sizeof(command), stdin) == NULL) {
-            if (feof(stdin)) {  // 检查是否是EOF
+        if(!fgets(command, 256, stdin)) {// 输入命令
+            if(feof(stdin)) {// 如果遇到eof(ctrl + D)
                 printf("\n");
                 Error(0);
                 exit(EXIT_SUCCESS);
             }
             continue;
         }
-        
-        // 保存命令副本用于显示
-        strncpy(command_copy, command, sizeof(command_copy) - 1);
-        command_copy[sizeof(command_copy) - 1] = '\0';
-        
-        // 移除末尾的换行符
+
         size_t len = strlen(command);
         if (len > 0 && command[len - 1] == '\n') {
             command[len - 1] = '\0';
             len--;
         }
-        
-        // 跳过空命令
-        if (len == 0) {
-            continue;
-        }
 
-        // 处理退出命令
-        if (strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {
-            // 退出前检查是否有后台进程
-            if (bg_count > 0) {
-                printf("还有 %d 个后台进程在运行，确定退出？(y/n): ", bg_count);
-                char answer[10];
-                if (fgets(answer, sizeof(answer), stdin) != NULL) {
-                    if (answer[0] != 'y' && answer[0] != 'Y') {
-                        continue;  // 不退出，继续shell
+        if(strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {// 处理退出
+            if(bgpCount > 0) {
+                printf("当前后台还有 %d 个进程正在运行，是否要强行关闭? (y/n): ", bgpCount);
+                if(fgets(answer, sizeof(answer), stdin)) {
+                    if(answer[0] != 'y' && answer[0] != 'Y') {
+                        continue;
                     }
                 }
             }
             Error(0);
-            exit(EXIT_SUCCESS);
+            exit(EXIT_SUCCESS); 
         }
 
         // 添加jobs命令，显示后台任务
         if (strcmp("jobs", command) == 0) {
-            if (bg_count == 0) {
+            if (bgpCount == 0) {
                 printf("没有后台进程\n");
             } else {
                 printf("后台进程列表：\n");
-                for (int i = 0; i < bg_count; i++) {
+                for (int i = 0; i < bgpCount; i++) {
                     printf("[%d] %d\t%s\t%s\n", 
                            i + 1, 
-                           bg_processes[i].pid, 
-                           bg_processes[i].active ? "运行中" : "已完成",
-                           bg_processes[i].command);
+                           bgProcess[i].pid, 
+                           bgProcess[i].isstillhere ? "运行中" : "已完成",
+                           bgProcess[i].command);
                 }
             }
             continue;
         }
 
-        // 解析命令
-        int arg_count = ParseCommand(command, args, &isback);
-
-        if (arg_count == 0 || args[0] == NULL) {
-            continue;  // 空命令
+        // 处理cd命令
+        if (strncmp(command, "cd", 2) == 0 && (command[2] == ' ' || command[2] == '\0')) {
+            ParseCommand(command, args, &isback);
+            
+            // 如果没有参数，cd到home目录
+            if (args[1] == NULL || strcmp(args[1], "~") == 0) {
+                char *home = getenv("HOME");
+                if (home == NULL) {
+                    fprintf(stderr, "cd: HOME环境变量未设置\n");
+                } else if (chdir(home) != 0) {
+                    perror("cd");
+                }
+            }
+            // 处理"cd -"回到上一个目录
+            else if (strcmp(args[1], "-") == 0) {
+                static char prev_path[MAX_PATH] = "";
+                if (prev_path[0] == '\0') {
+                    fprintf(stderr, "cd: 没有上一个目录\n");
+                } else {
+                    char temp[MAX_PATH];
+                    if (getcwd(temp, sizeof(temp)) != NULL) {
+                        if (chdir(prev_path) == 0) {
+                            strcpy(prev_path, temp);
+                            printf("%s\n", prev_path);
+                        } else {
+                            perror("cd");
+                        }
+                    }
+                }
+            }
+            // 普通目录切换
+            else {
+                char target_path[MAX_PATH];
+                
+                // 处理相对路径和绝对路径
+                if (args[1][0] == '/') {
+                    strncpy(target_path, args[1], MAX_PATH - 1);
+                    target_path[MAX_PATH - 1] = '\0';
+                } else {
+                    // 保存上一个目录
+                    static char prev_path[MAX_PATH] = "";
+                    if (getcwd(target_path, sizeof(target_path)) != NULL) {
+                        strcpy(prev_path, target_path);
+                        strncat(target_path, "/", MAX_PATH - strlen(target_path) - 1);
+                        strncat(target_path, args[1], MAX_PATH - strlen(target_path) - 1);
+                    }
+                }
+                
+                // 执行目录切换
+                if (chdir(args[1]) != 0) {
+                    perror("cd");
+                }
+            }
+            continue;  // 继续下一次循环
         }
 
-        // 调试信息（可以注释掉）
-        // printf("执行命令: %s\n", args[0]);
-        
+        ParseCommand(command, args, &isback);// 解析命令行
+
         execpath = SearchPath(args[0]);
         
         if(!execpath) {
@@ -380,28 +420,23 @@ void Shell() {
             perror("fork");
             break;
         
-        case 0:  // 子进程
+        case 0:
             // 如果是后台进程，忽略终端信号
             if (isback) {
                 signal(SIGINT, SIG_IGN);
                 signal(SIGQUIT, SIG_IGN);
             }
-            
             extern char* environ[];
             if(execve(execpath, args, environ) == -1) {
-                perror("execve");
                 exit(1);
             }
             break;
-            
-        default:  // 父进程
-            if (isback) {
-                // 后台运行：不等待，记录进程
-                AddBgProcess(pidChild, command_copy);
-            } else {
-                // 前台运行：等待子进程结束
+        default:
+            if(isback) {
+                AddBgProcess(pidChild, command);
+            }else {
                 waitpid(pidChild, &status, 0);
-                
+
                 if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
                     Error(1);
                 }

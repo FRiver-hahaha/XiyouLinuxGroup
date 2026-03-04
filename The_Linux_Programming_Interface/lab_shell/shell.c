@@ -1,7 +1,7 @@
-// 3.3已完成后台进程&
+// 3.4已完成cd切换
 
-// 明天完成cd
-
+// 明天完成sort
+#include <locale.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,6 +36,8 @@ void AddBgProcess(pid_t pid, char* command);// 添加后台进程
 void CheckBgProcess(void);// 检查后台进程
 
 int main() {
+    setlocale(LC_ALL, "");// 使得shell支持更多编码
+
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
     signal(SIGCHLD, SignalZombie);// 处理僵尸进程
 
@@ -105,7 +107,6 @@ void SignalZombie(int sig) {
             if(bgProcess[i].pid == currentPid && bgProcess[i].isstillhere) {
                 bgProcess[i].isstillhere = 0;// 设置为已回收
                 printf("\n[ %d ] %s 进程已回收\n", currentPid, bgProcess[i].command);
-                printf("# ");
                 fflush(stdout);
                 break;
             }
@@ -221,11 +222,10 @@ void Error(int isError) {
     case 0:// 退出shell
         printf("\n退出shell\n");
         break;
-
-    case 1:// 路径错误
-        printf("\n找不到该路径，也可能路径输入错误，请重试...\n");
-        break;
     
+    case 2:// 未获取到环境变量
+        printf("\n未获取到环境变量...\n");
+        break;
     default:
         break;
     }
@@ -287,15 +287,26 @@ void Shell() {
     char *args[MAX_ARGS];
 
     char command[256];
-    char commandShow[256];
+    char currentPath[MAX_PATH];
     char answer[10];
     char* execpath = NULL;
     pid_t pidChild;
     int status, isback = 0;
+
     while(1) {
+
+        static char prevPath[MAX_PATH] = "";
+
         CheckBgProcess();
-        printf("# ");
+
+        if(getcwd(currentPath, MAX_PATH)) {
+            printf("->%s ", currentPath);
+        }else {
+            printf("-> ");
+        }
+
         fflush(stdout);
+
         if(!fgets(command, 256, stdin)) {// 输入命令
             if(feof(stdin)) {// 如果遇到eof(ctrl + D)
                 printf("\n");
@@ -304,9 +315,6 @@ void Shell() {
             }
             continue;
         }
-
-        strncpy(commandShow, command, 255);
-        commandShow[255] = '\0';
 
         size_t len = strlen(command);
         if (len > 0 && command[len - 1] == '\n') {
@@ -343,15 +351,82 @@ void Shell() {
             }
             continue;
         }
+        if(strncmp("cd", command, 2) == 0 && (command[2] == ' ' || command[2] == '\0')) {// 处理cd
+            ParseCommand(command, args, &isback);// 解析命令行
 
-        ParseCommand(command, args, &isback);// 解析命令行
+            /*
+                切换回主目录
+                先获取到环境变量home，
+                如果没有就报错，有就切过去
+            */
+
+            if(args[1] == NULL || strcmp(args[1], "~") == 0) {
+                char* home = getenv("HOME");
+                if(!home) {
+                    Error(2);
+                }else {
+                    getcwd(prevPath, MAX_PATH);
+                    chdir(home);
+                }
+            }
+
+            /*
+                切换回上一级目录
+                先创建一个静态数组，
+                用来存储上一级目录，默认为空。
+                如果上一级目录没内容就报错，
+                有内容则先把当前目录保存下来，
+                在切换回去之前，
+                把当前目录保存为上一级目录，之后切换目录
+            */
+
+            else if (strcmp(args[1], "-") == 0) {// 切换回上一个目录
+                if (prevPath[0] == '\0') {
+                    getcwd(prevPath, MAX_PATH);
+                    continue;
+                } else {
+                    char tmpCurrentPath[MAX_PATH];
+                    if (getcwd(tmpCurrentPath, MAX_PATH)) {
+                        chdir(prevPath);
+                        printf("cd: 已切换至%s\n", prevPath);
+                        strcpy(prevPath, tmpCurrentPath);
+                        
+                        
+                    }
+                }
+
+             /*
+                切换回上一级目录
+                先创建一个静态数组，
+                用来存储上一级目录，默认为空。
+                如果上一级目录没内容就报错，
+                有内容则先把当前目录保存下来，
+                在切换回去之前，
+                把当前目录保存为上一级目录，之后切换目录
+            */
+
+            }else {
+                char targetPath[MAX_PATH];
+
+                if(args[1][0] == '/') {
+                    strncat(targetPath, args[1], MAX_PATH - 1);
+                    targetPath[MAX_PATH - 1] = '\0';
+                }else {
+                    if(getcwd(targetPath, MAX_PATH)) {
+                        strcpy(prevPath
+                , targetPath);
+                        strncat(targetPath, "/", MAX_PATH - strlen(targetPath) - 1);
+                        strncat(targetPath, args[1], MAX_PATH - strlen(targetPath) - 1);
+                    }
+                }
+
+                chdir(args[1]);
+            }
+        }else {
+            ParseCommand(command, args, &isback);// 解析命令行
+        }
 
         execpath = SearchPath(args[0]);
-        
-        if(!execpath) {
-            Error(1);
-            continue;
-        }
 
         switch (pidChild = fork())
         {
@@ -375,14 +450,8 @@ void Shell() {
                 AddBgProcess(pidChild, command);
             }else {
                 waitpid(pidChild, &status, 0);
-
-                if(WIFEXITED(status) && WEXITSTATUS(status) == 1) {
-                    Error(1);
-                }
             }
             break;
         }
     }
-    free(command);
-    free(commandShow);
-}
+}   
