@@ -1,8 +1,9 @@
-// 3.4已完成cd切换
+// 3.4已完成界面美化
 
-// 明天完成sort
-#include <locale.h>
+// 周五六日内完成重定向
+#define _GNU_SOURCE// 用来导入GNU扩展，使得中文内容编码正常
 #include <unistd.h>
+#include <locale.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/wait.h>// 等待子进程
@@ -11,6 +12,8 @@
 
 #define COLOR_RESET "\033[0m" // 重置 
 #define COLOR_WELCOME "\033[1;34m" // 欢迎界面(粗体蓝色)
+#define COLOR_POINT "\033[2;32m" // 高亮显示当前行指向(粗体暗绿色)
+#define COLOR_HIGHLIGHT "\033[1;32m" // 高亮显示当前行索引(粗体亮绿色)
 #define MAX_PATH 256
 #define MAX_ARGS 64
 #define MAX_BGPROCESS 128
@@ -36,8 +39,6 @@ void AddBgProcess(pid_t pid, char* command);// 添加后台进程
 void CheckBgProcess(void);// 检查后台进程
 
 int main() {
-    setlocale(LC_ALL, "");// 使得shell支持更多编码
-
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
     signal(SIGCHLD, SignalZombie);// 处理僵尸进程
 
@@ -138,9 +139,11 @@ char* SearchPath(char* command) {
     static char fullpath[MAX_PATH];
 
     if(command[0] == '/' || command[0] == '.') {
-        if(access(command, X_OK) == 0) {// 绝对路径直接返回command
+        if(access(command, X_OK) == 0) {// 绝对路径直接返回
+            strncpy(fullpath, command, MAX_PATH - 1);
+            fullpath[MAX_PATH - 1] = '\0';
             free(pathcopy);
-            return command;
+            return fullpath;
         }
         free(pathcopy);
         return NULL;
@@ -199,11 +202,12 @@ int ParseCommand(char* command, char* args[], int* isback) {
         return 0;
     }
 
-    char* token = strtok(start, " \t");
-
-    while(cnt <= MAX_ARGS && token != NULL) {
+    char* saveptr;
+    char* token = strtok_r(start, " \t", &saveptr);
+    
+    while(cnt < MAX_ARGS - 1 && token != NULL) {
         args[cnt++] = token;
-        token = strtok(NULL, " \t");
+        token = strtok_r(NULL, " \t", &saveptr);
     }
     args[cnt] = NULL;
 
@@ -300,9 +304,9 @@ void Shell() {
         CheckBgProcess();
 
         if(getcwd(currentPath, MAX_PATH)) {
-            printf("->%s ", currentPath);
+            printf("%s->%s%s%s%s ", COLOR_POINT, COLOR_RESET, COLOR_HIGHLIGHT, currentPath, COLOR_RESET);
         }else {
-            printf("-> ");
+            printf("%s->%s ", COLOR_POINT, COLOR_RESET);
         }
 
         fflush(stdout);
@@ -390,8 +394,6 @@ void Shell() {
                         chdir(prevPath);
                         printf("cd: 已切换至%s\n", prevPath);
                         strcpy(prevPath, tmpCurrentPath);
-                        
-                        
                     }
                 }
 
@@ -406,20 +408,18 @@ void Shell() {
             */
 
             }else {
-                char targetPath[MAX_PATH];
+                char targetPath[MAX_PATH];// 保存具有根目录的完整路径节点，供未来遇到没有完整路径的情况时，可以拿来与其拼接
 
                 if(args[1][0] == '/') {
                     strncat(targetPath, args[1], MAX_PATH - 1);
                     targetPath[MAX_PATH - 1] = '\0';
                 }else {
                     if(getcwd(targetPath, MAX_PATH)) {
-                        strcpy(prevPath
-                , targetPath);
+                        strcpy(prevPath, targetPath);
                         strncat(targetPath, "/", MAX_PATH - strlen(targetPath) - 1);
                         strncat(targetPath, args[1], MAX_PATH - strlen(targetPath) - 1);
                     }
                 }
-
                 chdir(args[1]);
             }
         }else {
@@ -440,7 +440,7 @@ void Shell() {
                 signal(SIGINT, SIG_IGN);
                 signal(SIGQUIT, SIG_IGN);
             }
-            extern char* environ[];
+            extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
             if(execve(execpath, args, environ) == -1) {
                 exit(1);
             }
