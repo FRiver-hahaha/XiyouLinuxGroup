@@ -14,3 +14,7 @@
 * 14 - [数据结构 - Data Structures](https://www.bilibili.com/video/av15987774/)
 * 15 - [阿兰·图灵 - Alan Turing](https://www.bilibili.com/video/av16090115/)
 * 16 - [软件工程 - Software Engineering](https://www.bilibili.com/video/av16751202/)
+* 17 - [集成电路、摩尔定律 - Integrated Circuits & Moore’s Law](https://www.bilibili.com/video/av17186768)
+* 18 - [操作系统 - Operating Systems](https://www.bilibili.com/video/av17192468)
+* 19 - [内存 & 储存介质 - Memory & Storage](https://www.bilibili.com/video/av17192483/)
+* 20 - [文件系统 - Files & File Systems](https://www.bilibili.com/video/av17209268/)
