@@ -2,6 +2,7 @@
 
 // 周五六日内完成重定向
 #define _GNU_SOURCE// 用来导入GNU扩展，使得中文内容编码正常
+#include <fcntl.h>
 #include <unistd.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@
 #define MAX_PATH 256
 #define MAX_ARGS 64
 #define MAX_BGPROCESS 128
+#define MAX_PIPES 16
 
 
 typedef struct {
@@ -24,6 +26,16 @@ typedef struct {
     char command[256];
     int isstillhere;
 }Bgprocess;
+
+typedef struct {
+    char *args[MAX_ARGS];
+    int argc;
+    char *inputFile;
+    char *outputFile;
+    int appendOutput;  // 1代表>>,0代表>
+    int hasPipe;
+    int pipeFd[2];
+} Command;
 
 Bgprocess bgProcess[MAX_BGPROCESS];// 后台进程
 int bgpCount = 0;// 后台进程数
@@ -37,9 +49,20 @@ char* SearchPath(char* command);// 路径搜索
 void SignalZombie(int sig);  // 处理僵尸进程
 void AddBgProcess(pid_t pid, char* command);// 添加后台进程
 void CheckBgProcess(void);// 检查后台进程
+void CleanCommand(Command commands[]);// 清理管道
+
+/*
+以下三个函数先设置command结构体，之后设置重定向，最后创建进程执行管道
+*/ 
+
+int HandlePipe(Command commands[], char command[], char* args[], int* isback);// 处理管道
+int setRediraction(Command commands[]);// 设置重定向
+void execPipe(Command commands[], int cmdCount, int isback);// 执行管道
 
 int main() {
+    // 注册信号
     signal(SIGINT, SIG_IGN);// 解决ctrl + c中断进程的问题
+    signal(SIGQUIT, SIG_IGN);// 解决ctrl + \中断进程的问题
     signal(SIGCHLD, SignalZombie);// 处理僵尸进程
 
     setvbuf(stdin, NULL, _IOLBF, 0);// 处理行缓冲，使得快速显示内容
@@ -47,6 +70,206 @@ int main() {
 
     FirstShow();//启动整体程序
     exit(EXIT_SUCCESS);
+}
+
+/*
+    清理命令资源,
+    不需要清理文件名字符串，
+    因为它作为指针指向原始命令字符串
+*/
+
+void CleanCommand(Command commands[]) {
+    commands->argc = 0;
+    commands->inputFile = NULL;
+    commands->outputFile = NULL;
+    commands->appendOutput = 0;
+    commands->hasPipe = 0;
+}
+
+/*
+    用来执行管道。
+    先设置好前置管道和当前管道，
+    在具有一定管道数目内，
+    执行for循环创建进程。
+    在子进程内，
+    设置好输入输出重定向。
+    之后执行进程。
+    在父进程内，
+    关闭前置进程，并且设置好当前进程。
+    由于当前进程下的管道属于同一个进程组，同时执行，
+    所以可以只记录第一个Pipepid。
+
+*/
+
+void execPipe(Command commands[], int cmdCount, int isback) {
+    int prePipe[2] = {-1, -1};// 分别为读端，写端
+    int currentPipe[2];// 分别为读端，写端
+    pid_t PipePids[MAX_PIPES];
+
+    for(int i = 0; i < cmdCount; ++i) {
+        if(i < cmdCount - 1) {
+            pipe(currentPipe);
+        }
+
+        switch (PipePids[i] = fork())
+        {
+        case -1:
+            perror("fork");
+            break;
+            
+        case 0:
+            if(isback) {// 忽略ctrl + c 和 ctrl + \ 的信号
+                signal(SIGINT, SIG_IGN);
+                signal(SIGQUIT, SIG_IGN);
+            }
+
+            if(prePipe[0] != -1) {// 设置输入重定向
+                dup2(prePipe[0], STDIN_FILENO);
+                close(prePipe[0]);
+                close(prePipe[1]);
+            }
+
+            if(i < cmdCount - 1) {// 设置输出重定向
+                close(currentPipe[0]);
+                dup2(currentPipe[1], STDOUT_FILENO);
+                close(currentPipe[1]);
+            }
+
+            if(setRediraction(commands)) {
+                exit(1);
+            }
+            
+            char* execPath = SearchPath(commands[i].args[0]);
+            if(!execPath) {
+                fprintf(stderr, "未找到该命令：%s\n", commands[i].args[0]);
+                exit(127);
+            }
+
+            extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
+            if(execve(execPath, commands[i].args, environ) == -1) {
+                fprintf(stderr, "execve失败\n");
+                exit(126);
+            }
+
+            break;
+        
+        default:
+            if(prePipe[0] != -1) {// 关闭上一个管道的fd，否则不会结束。
+                close(prePipe[0]);
+                close(prePipe[1]);
+            }
+
+            if(i < cmdCount - 1) {// 保存当前管道
+                prePipe[0] = currentPipe[0];
+                prePipe[1] = currentPipe[1];
+            }
+            break;
+        }
+    }
+
+    if(isback) {
+        char cmd[256] = "";// 后台创建进程。
+        for(int i = 0; i < cmdCount; ++i) {
+            if(i > 0) {
+                strcat(cmd, "|");
+            }
+            strcat(cmd, commands[i].args[0]);
+        }
+        AddBgProcess(PipePids[0], cmd);
+    }else {
+        // 前台等待所有进程。
+        for(int i = 0; i < cmdCount; ++i) {
+            waitpid(PipePids[i], NULL, 0);
+        }
+    }
+}
+
+/*
+    用来针对管道设置重定向。
+    首先根据cmd结构体内的参数，
+    决定是否要进行重定向。
+    处理时要新开一个fd，
+    即获取到当前文件，
+    之后用dup2将重定向的宏，
+    指定到当前文件，并且关闭之前的文件描述符fd。
+    如果出错，返回-1,
+    正常则返回。
+*/
+
+int setRediraction(Command commands[]) {
+    if(commands->inputFile) {// 处理输入重定向
+        int fd = open(commands->inputFile, O_RDONLY);
+        if(fd < 0) {
+            fprintf(stderr, "无法打开该输入文件：%s\n", commands->inputFile);
+            return -1;
+        }
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+    }
+
+    if(commands->outputFile) {
+        int flags = O_WRONLY | O_CREAT;
+        if(commands->appendOutput) {
+            flags |= O_APPEND;
+        }else {
+            flags |= O_TRUNC;
+        }
+
+        int fd = open(commands->outputFile, flags, 0644);// 644 代表 所有者读写，所属组只读，其他用户只读
+        if(fd < 0) {
+            fprintf(stderr, "无法打开该输出文件：%s\n", commands->outputFile);
+            return -1;
+        }
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
+
+    return 0;
+}
+
+/*
+    用来处理命令参数中的管道。
+    先在一个for循环内记录非管道参数的数目。
+    之后根据这个数目，
+    创建一个for循环，
+    在数目内设置每个command结构体的参数。
+    先初始化好每个参数，
+    之后根据<,>,>>，分别对每个结构体cmd内进行标记。
+    如果if都被跳过了，则把当前参数标记好。
+*/
+
+int HandlePipe(Command commands[], char command[], char* args[], int* isback) {
+    int countNoPipe = 0;
+    int argIndex = 0;
+    CleanCommand(&commands[countNoPipe]);
+
+    while(args[argIndex]) {
+        if(strcmp(args[argIndex], "|") == 0) {//遇到管道则跳过处理
+            commands[countNoPipe].args[commands[countNoPipe].argc] = NULL;
+            countNoPipe++;
+            CleanCommand(&commands[countNoPipe]);
+            argIndex++;
+            continue;
+        }
+
+        // 处理参数成为管道，对每个管道开始设置标记，供后续函数进行识别
+        if(strcmp("<", args[argIndex]) == 0) {
+            commands[countNoPipe].inputFile = args[++argIndex];
+        }else if(strcmp(">", args[argIndex]) == 0) {
+            commands[countNoPipe].outputFile = args[++argIndex];
+            commands[countNoPipe].appendOutput = 0;
+        }else if(strcmp(">>", args[argIndex]) == 0) {
+            commands[countNoPipe].outputFile = args[++argIndex];
+            commands[countNoPipe].appendOutput = 1;
+        }else {
+            commands[countNoPipe].args[commands[countNoPipe].argc++] = args[argIndex];
+        }
+        argIndex++;
+    }
+
+    commands[countNoPipe].args[commands[countNoPipe].argc] = NULL;
+    commands[countNoPipe].hasPipe = 0;
+    return countNoPipe + 1;// 返回命令数量
 }
 
 /*
@@ -202,12 +425,49 @@ int ParseCommand(char* command, char* args[], int* isback) {
         return 0;
     }
 
+    char* token;
     char* saveptr;
-    char* token = strtok_r(start, " \t", &saveptr);
-    
-    while(cnt < MAX_ARGS - 1 && token != NULL) {
-        args[cnt++] = token;
-        token = strtok_r(NULL, " \t", &saveptr);
+    char* p = start;
+    int inQuote = 0;
+    char quoteChar = 0;
+
+    while(cnt < MAX_ARGS - 1 && *p) {
+        //除杂
+        while(*p == ' ' || *p == '\t') p++;
+        if(*p == '\0') break;
+        
+        if(*p == '"' || *p == '\'') {
+            inQuote = 1;
+            quoteChar = *p;//确定为引号，供后续比较，确定区间
+            p++; // 跳过左引号
+            token = p;
+            
+            while(*p) {
+                if(*p == quoteChar) {
+                    // 如果是引号，检查前面是否是转义符
+                    if(*(p-1) != '\\') {
+                        break;  // 找到未被转义的右引号
+                    }
+                }
+                p++;
+            }
+            
+            if(*p == quoteChar) {//找到右引号
+                *p = '\0';
+                args[cnt++] = token;
+                p++;
+            }
+            inQuote = 0;
+        } else {
+            // 普通参数
+            token = p;
+            while(*p && *p != ' ' && *p != '\t') p++;//除杂
+            if(*p) {
+                *p = '\0';
+                p++;
+            }
+            args[cnt++] = token;
+        }
     }
     args[cnt] = NULL;
 
@@ -422,36 +682,47 @@ void Shell() {
                 }
                 chdir(args[1]);
             }
-        }else {
-            ParseCommand(command, args, &isback);// 解析命令行
         }
 
-        execpath = SearchPath(args[0]);
+        if(strchr(command, '|') != NULL || strchr(command, '>') != NULL || strchr(command, '<') != NULL) {
+            Command commands[MAX_PIPES];
+            ParseCommand(command, args, &isback);
+            int cmdCount = HandlePipe(commands, command, args, &isback);
 
-        switch (pidChild = fork())
-        {
-        case -1:
-            perror("fork");
-            break;
-        
-        case 0:
-            // 如果是后台进程，忽略终端信号
-            if (isback) {
-                signal(SIGINT, SIG_IGN);
-                signal(SIGQUIT, SIG_IGN);
+            if(cmdCount) {
+                execPipe(commands, cmdCount, isback);
             }
-            extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
-            if(execve(execpath, args, environ) == -1) {
-                exit(1);
+        }else {
+            ParseCommand(command, args, &isback);// 解析命令行
+
+
+            execpath = SearchPath(args[0]);
+
+            switch (pidChild = fork())
+            {
+            case -1:
+                perror("fork");
+                break;
+            
+            case 0:
+                // 如果是后台进程，忽略终端信号
+                if (isback) {
+                    signal(SIGINT, SIG_IGN);
+                    signal(SIGQUIT, SIG_IGN);
+                }
+                extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
+                if(execve(execpath, args, environ) == -1) {
+                    exit(1);
+                }
+                break;
+            default:
+                if(isback) {
+                    AddBgProcess(pidChild, command);
+                }else {
+                    waitpid(pidChild, &status, 0);
+                }
+                break;
             }
-            break;
-        default:
-            if(isback) {
-                AddBgProcess(pidChild, command);
-            }else {
-                waitpid(pidChild, &status, 0);
-            }
-            break;
         }
     }
 }   
