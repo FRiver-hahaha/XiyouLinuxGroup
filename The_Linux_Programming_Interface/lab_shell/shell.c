@@ -1,6 +1,3 @@
-// 3.4已完成界面美化
-
-// 周五六日内完成重定向
 #define _GNU_SOURCE// 用来导入GNU扩展，使得中文内容编码正常
 #include <fcntl.h>
 #include <unistd.h>
