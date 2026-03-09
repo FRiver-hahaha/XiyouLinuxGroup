@@ -132,10 +132,16 @@ void execPipe(Command commands[], int cmdCount, int isback) {
                 close(currentPipe[1]);
             }
 
-            if(setRediraction(commands)) {
+            if(setRediraction(commands + i)) {
                 exit(1);
             }
             
+            for(int fd = 3; fd < 1024; ++fd) {// 关闭了
+                if(fd != STDERR_FILENO && fd != STDIN_FILENO && fd != STDOUT_FILENO) {
+                    close(fd);
+                }
+            }
+
             char* execPath = SearchPath(commands[i].args[0]);
             if(!execPath) {
                 fprintf(stderr, "未找到该命令：%s\n", commands[i].args[0]);
@@ -147,7 +153,6 @@ void execPipe(Command commands[], int cmdCount, int isback) {
                 fprintf(stderr, "execve失败\n");
                 exit(126);
             }
-
             break;
         
         default:
