@@ -47,6 +47,9 @@ void SignalZombie(int sig);  // 处理僵尸进程
 void AddBgProcess(pid_t pid, char* command);// 添加后台进程
 void CheckBgProcess(void);// 检查后台进程
 void CleanCommand(Command commands[]);// 清理管道
+char* simpleCurrentPath(char currentPath[]);// 简化路径显示
+int isChinese(const char* str);
+
 
 /*
 以下三个函数先设置command结构体，之后设置重定向，最后创建进程执行管道
@@ -67,6 +70,56 @@ int main() {
 
     FirstShow();//启动整体程序
     exit(EXIT_SUCCESS);
+}
+
+int isChinese(const char* str) {
+    // UTF-8中文字符的第一个字节范围：0xE4-0xE9
+    unsigned char c = (unsigned char)str[0];
+    return (c >= 0xE4 && c <= 0xE9);
+}
+
+
+char* simpleCurrentPath(char currentPath[]) {
+    if(strcmp(currentPath, "/") == 0) {
+        return currentPath;
+    }
+
+    char copy[MAX_PATH];    
+    copy[0] = '\0';
+    strcat(copy, currentPath);
+    int cnt = 0;
+    int cntToken = 0;
+
+    for(int i = 0; i < strlen(currentPath); ++i) {
+        if(currentPath[i] == '/') {
+            cnt++;
+        }
+    }
+
+    static char result[MAX_PATH] = "";
+    result[0] = '\0';
+
+    char* token = strtok(copy, "/");
+    while(token && cntToken <= cnt - 2) {
+        if(strcmp("home", token) == 0) {
+            strcat(result, "/~");
+        }else {
+            strcat(result, "/");
+            if(isChinese(token)) {
+                strncat(result, token, 3);
+            }else {
+                strncat(result, token, 1);
+            }
+        }
+        token = strtok(NULL, "/");
+        cntToken++;
+    }
+    if(token) {
+        strcat(result, "/");
+        strcat(result, token);
+    }
+
+    return result;
 }
 
 /*
@@ -144,13 +197,13 @@ void execPipe(Command commands[], int cmdCount, int isback) {
 
             char* execPath = SearchPath(commands[i].args[0]);
             if(!execPath) {
-                fprintf(stderr, "未找到该命令：%s\n", commands[i].args[0]);
+                fprintf(stderr, "shell: %s: 未找到命令\n", commands[i].args[0]);
                 exit(127);
             }
 
             extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
             if(execve(execPath, commands[i].args, environ) == -1) {
-                fprintf(stderr, "execve失败\n");
+                fprintf(stderr, "shell: %s: 执行失败\n", commands[i].args[0]);
                 exit(126);
             }
             break;
@@ -202,7 +255,7 @@ int setRediraction(Command commands[]) {
     if(commands->inputFile) {// 处理输入重定向
         int fd = open(commands->inputFile, O_RDONLY);
         if(fd < 0) {
-            fprintf(stderr, "无法打开该输入文件：%s\n", commands->inputFile);
+            fprintf(stderr, "shell: %s: 无法打开输入文件\n", commands->inputFile);
             return -1;
         }
         dup2(fd, STDIN_FILENO);
@@ -219,7 +272,7 @@ int setRediraction(Command commands[]) {
 
         int fd = open(commands->outputFile, flags, 0644);// 644 代表 所有者读写，所属组只读，其他用户只读
         if(fd < 0) {
-            fprintf(stderr, "无法打开该输出文件：%s\n", commands->outputFile);
+            fprintf(stderr, "shell: %s: 无法打开输出文件\n", commands->outputFile);
             return -1;
         }
         dup2(fd, STDOUT_FILENO);
@@ -256,13 +309,19 @@ int HandlePipe(Command commands[], char command[], char* args[], int* isback) {
 
         // 处理参数成为管道，对每个管道开始设置标记，供后续函数进行识别
         if(strcmp("<", args[argIndex]) == 0) {
-            commands[countNoPipe].inputFile = args[++argIndex];
+            if(args[argIndex + 1]) {
+                commands[countNoPipe].inputFile = args[++argIndex];
+            }
         }else if(strcmp(">", args[argIndex]) == 0) {
-            commands[countNoPipe].outputFile = args[++argIndex];
-            commands[countNoPipe].appendOutput = 0;
+            if(args[argIndex + 1]) {
+                commands[countNoPipe].outputFile = args[++argIndex];
+                commands[countNoPipe].appendOutput = 0;
+            }
         }else if(strcmp(">>", args[argIndex]) == 0) {
-            commands[countNoPipe].outputFile = args[++argIndex];
-            commands[countNoPipe].appendOutput = 1;
+            if(args[argIndex + 1]) {
+                commands[countNoPipe].outputFile = args[++argIndex];
+                commands[countNoPipe].appendOutput = 1;
+            }
         }else {
             commands[countNoPipe].args[commands[countNoPipe].argc++] = args[argIndex];
         }
@@ -352,39 +411,47 @@ void SignalZombie(int sig) {
 */
 
 char* SearchPath(char* command) {
-
     if(!command || *command == '\0') {
         return NULL;
     }
 
+    if(command[0] == '/' || command[0] == '.') {
+        if(access(command, F_OK) != 0) {
+            fprintf(stderr, "shell: %s: 没有那个文件或目录\n", command);
+            return NULL;
+        }
+        if(access(command, X_OK) != 0) {
+            fprintf(stderr, "shell: %s: 权限不够\n", command);
+            return NULL;
+        }
+        return command;
+    }
 
     char* path = getenv("PATH");
+    if(!path) {
+        return NULL;
+    }
+    
     char *pathcopy = strdup(path); 
     char* dir = strtok(pathcopy, ":");
     static char fullpath[MAX_PATH];
 
-    if(command[0] == '/' || command[0] == '.') {
-        if(access(command, X_OK) == 0) {// 绝对路径直接返回
-            strncpy(fullpath, command, MAX_PATH - 1);
-            fullpath[MAX_PATH - 1] = '\0';
-            free(pathcopy);
-            return fullpath;
-        }
-        free(pathcopy);
-        return NULL;
-    }
-
     while(dir) {
         snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, command);
 
-        if(access(fullpath, X_OK) == 0) {// 非绝对路径返回完整路径
-            free(pathcopy);
-            return fullpath;
+        if(access(fullpath, F_OK) == 0) {
+            if(access(fullpath, X_OK) == 0) {
+                free(pathcopy);
+                return fullpath;
+            } else {
+                free(pathcopy);
+                return NULL;
+            }
         }
-
         dir = strtok(NULL, ":");
     }
     free(pathcopy);
+    fprintf(stderr, "shell: %s: 未找到命令\n", command);
     return NULL;
 }
 
@@ -398,7 +465,6 @@ int ParseCommand(char* command, char* args[], int* isback) {
     int cnt = 0, len = strlen(command);
     
     *isback = 0;
-
 
     // 处理冗余内容
     char* start = command;
@@ -539,6 +605,7 @@ void FirstShow() {
         }
         usleep(50000);
     };
+    printf("\n");
     Shell();
 }
 
@@ -551,8 +618,8 @@ void FirstShow() {
 
 void Shell() {
     char *args[MAX_ARGS];
-
-    char command[256];
+    char hostName[256];
+    char command[1024];
     char currentPath[MAX_PATH];
     char answer[10];
     char* execpath = NULL;
@@ -564,17 +631,18 @@ void Shell() {
         static char prevPath[MAX_PATH] = "";
 
         CheckBgProcess();
-
+        gethostname(hostName, 256);
         if(getcwd(currentPath, MAX_PATH)) {
-            printf("%s->%s%s%s%s ", COLOR_POINT, COLOR_RESET, COLOR_HIGHLIGHT, currentPath, COLOR_RESET);
+
+            printf("%s@%s->%s%s%s%s ", COLOR_POINT, hostName, COLOR_RESET, COLOR_HIGHLIGHT, simpleCurrentPath(currentPath), COLOR_RESET);
         }else {
-            printf("%s->%s ", COLOR_POINT, COLOR_RESET);
+            printf("%s@%s->%s ", COLOR_POINT, hostName, COLOR_RESET);
         }
 
         fflush(stdout);
 
-        if(!fgets(command, 256, stdin)) {// 输入命令
-            if(feof(stdin)) {// 如果遇到eof(ctrl + D)
+        if(!fgets(command, sizeof(command), stdin)) {
+            if(feof(stdin)) {
                 printf("\n");
                 Error(0);
                 exit(EXIT_SUCCESS);
@@ -582,13 +650,58 @@ void Shell() {
             continue;
         }
 
+        // 检查是否有未闭合的引号
+        int in_quote = 0;
+        char quote_char = 0;
         size_t len = strlen(command);
+        
+        // 检查当前行的引号状态
+        for(int i = 0; i < len; i++) {
+            if(command[i] == '"' || command[i] == '\'') {
+                if(!in_quote) {
+                    in_quote = 1;
+                    quote_char = command[i];
+                } else if(command[i] == quote_char && (i == 0 || command[i-1] != '\\')) {
+                    in_quote = 0;
+                }
+            }
+        }
+
+        // 如果引号未闭合，继续读取更多行
+        while(in_quote) {
+            char more[1024];
+            fflush(stdout);
+            
+            if(!fgets(more, sizeof(more), stdin)) {
+                break;
+            }
+            
+            // 追加到 command
+            strncat(command, more, sizeof(command) - strlen(command) - 1);
+            
+            // 重新检查引号状态
+            len = strlen(command);
+            in_quote = 0;
+            for(int i = 0; i < len; i++) {
+                if(command[i] == '"' || command[i] == '\'') {
+                    if(!in_quote) {
+                        in_quote = 1;
+                        quote_char = command[i];
+                    } else if(command[i] == quote_char && (i == 0 || command[i-1] != '\\')) {
+                        in_quote = 0;
+                    }
+                }
+            }
+        }
+
+        // 移除末尾的换行符
+        len = strlen(command);
         if (len > 0 && command[len - 1] == '\n') {
             command[len - 1] = '\0';
             len--;
         }
 
-        if(strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {// 处理退出
+        if(strcmp("exit", command) == 0 || strcmp("quit", command) == 0) {
             if(bgpCount > 0) {
                 printf("当前后台还有 %d 个进程正在运行，是否要强行关闭? (y/n): ", bgpCount);
                 if(fgets(answer, sizeof(answer), stdin)) {
@@ -617,14 +730,8 @@ void Shell() {
             }
             continue;
         }
-        if(strncmp("cd", command, 2) == 0 && (command[2] == ' ' || command[2] == '\0')) {// 处理cd
-            ParseCommand(command, args, &isback);// 解析命令行
-
-            /*
-                切换回主目录
-                先获取到环境变量home，
-                如果没有就报错，有就切过去
-            */
+        if(strncmp("cd", command, 2) == 0 && (command[2] == ' ' || command[2] == '\0')) {
+            ParseCommand(command, args, &isback);
 
             if(args[1] == NULL || strcmp(args[1], "~") == 0) {
                 char* home = getenv("HOME");
@@ -632,58 +739,42 @@ void Shell() {
                     Error(2);
                 }else {
                     getcwd(prevPath, MAX_PATH);
-                    chdir(home);
+                    if(chdir(home) != 0) {
+                        fprintf(stderr, "cd: %s: 无法进入目录\n", home);
+                    }
                 }
             }
-
-            /*
-                切换回上一级目录
-                先创建一个静态数组，
-                用来存储上一级目录，默认为空。
-                如果上一级目录没内容就报错，
-                有内容则先把当前目录保存下来，
-                在切换回去之前，
-                把当前目录保存为上一级目录，之后切换目录
-            */
-
-            else if (strcmp(args[1], "-") == 0) {// 切换回上一个目录
+            else if (strcmp(args[1], "-") == 0) {
                 if (prevPath[0] == '\0') {
                     getcwd(prevPath, MAX_PATH);
                     continue;
                 } else {
                     char tmpCurrentPath[MAX_PATH];
                     if (getcwd(tmpCurrentPath, MAX_PATH)) {
-                        chdir(prevPath);
-                        printf("cd: 已切换至%s\n", prevPath);
-                        strcpy(prevPath, tmpCurrentPath);
+                        if(chdir(prevPath) == 0) {
+                            printf("%s\n", prevPath);
+                            strcpy(prevPath, tmpCurrentPath);
+                        } else {
+                            fprintf(stderr, "cd: %s: 无法进入目录\n", prevPath);
+                        }
                     }
                 }
-
-             /*
-                切换回上一级目录
-                先创建一个静态数组，
-                用来存储上一级目录，默认为空。
-                如果上一级目录没内容就报错，
-                有内容则先把当前目录保存下来，
-                在切换回去之前，
-                把当前目录保存为上一级目录，之后切换目录
-            */
-
             }else {
-                char targetPath[MAX_PATH];// 保存具有根目录的完整路径节点，供未来遇到没有完整路径的情况时，可以拿来与其拼接
-
+                char targetPath[MAX_PATH];
                 if(args[1][0] == '/') {
-                    strncat(targetPath, args[1], MAX_PATH - 1);
-                    targetPath[MAX_PATH - 1] = '\0';
+                    strcpy(targetPath, args[1]);
                 }else {
                     if(getcwd(targetPath, MAX_PATH)) {
                         strcpy(prevPath, targetPath);
-                        strncat(targetPath, "/", MAX_PATH - strlen(targetPath) - 1);
-                        strncat(targetPath, args[1], MAX_PATH - strlen(targetPath) - 1);
+                        strcat(targetPath, "/");
+                        strcat(targetPath, args[1]);
                     }
                 }
-                chdir(args[1]);
+                if(chdir(args[1]) != 0) {
+                    fprintf(stderr, "cd: %s: 没有那个文件或目录\n", args[1]);
+                }
             }
+            continue;
         }
 
         if(strchr(command, '|') != NULL || strchr(command, '>') != NULL || strchr(command, '<') != NULL) {
@@ -694,11 +785,19 @@ void Shell() {
             if(cmdCount) {
                 execPipe(commands, cmdCount, isback);
             }
+            continue;
         }else {
-            ParseCommand(command, args, &isback);// 解析命令行
+            ParseCommand(command, args, &isback);
 
+            if(args[0] == NULL) {
+                continue;
+            }
 
             execpath = SearchPath(args[0]);
+
+            if(execpath == NULL) {
+                continue;
+            }
 
             switch (pidChild = fork())
             {
@@ -707,13 +806,13 @@ void Shell() {
                 break;
             
             case 0:
-                // 如果是后台进程，忽略终端信号
                 if (isback) {
                     signal(SIGINT, SIG_IGN);
                     signal(SIGQUIT, SIG_IGN);
                 }
-                extern char** environ;// 不可写成* environ[]的形式，这与_GNU_SOURCE中声明的冲突
+                extern char** environ;
                 if(execve(execpath, args, environ) == -1) {
+                    fprintf(stderr, "shell: %s: 执行失败\n", args[0]);
                     exit(1);
                 }
                 break;
@@ -727,4 +826,4 @@ void Shell() {
             }
         }
     }
-}   
+}
