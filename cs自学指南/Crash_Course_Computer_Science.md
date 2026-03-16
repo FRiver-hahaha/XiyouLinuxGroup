@@ -20,3 +20,5 @@
 * 20 - [文件系统 - Files & File Systems](https://www.bilibili.com/video/av17209268/)
 * 21 - [压缩 - Compression](https://www.bilibili.com/video/av17192511/)
 * 22 - [命令行界面 - Keyboards & Command Line Interfaces](https://www.bilibili.com/video/av17451718/)
+* 23 - [屏幕 & 2D 图形显示 - Screens & 2D Graphics](https://www.bilibili.com/video/av17476087/)
+* 24 - [冷战和消费主义 - The Cold War and Consumerism](https://www.bilibili.com/video/av15637307/)

@@ -453,6 +453,7 @@ char* SearchPath(char* command) {
     free(pathcopy);
     fprintf(stderr, "shell: %s: 未找到命令\n", command);
     return NULL;
+     
 }
 
 /*
