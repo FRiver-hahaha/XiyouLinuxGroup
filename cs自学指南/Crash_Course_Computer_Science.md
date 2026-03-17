@@ -22,3 +22,5 @@
 * 22 - [命令行界面 - Keyboards & Command Line Interfaces](https://www.bilibili.com/video/av17451718/)
 * 23 - [屏幕 & 2D 图形显示 - Screens & 2D Graphics](https://www.bilibili.com/video/av17476087/)
 * 24 - [冷战和消费主义 - The Cold War and Consumerism](https://www.bilibili.com/video/av15637307/)
+* 25 - [个人计算机革命 - The Personal Computer Revolution](https://www.bilibili.com/video/av18789303/)
+* 26 - [图形用户界面 - Graphical User Interfaces](https://www.bilibili.com/video/av19035296/)
