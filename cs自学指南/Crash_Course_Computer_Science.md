@@ -24,3 +24,4 @@
 * 24 - [冷战和消费主义 - The Cold War and Consumerism](https://www.bilibili.com/video/av15637307/)
 * 25 - [个人计算机革命 - The Personal Computer Revolution](https://www.bilibili.com/video/av18789303/)
 * 26 - [图形用户界面 - Graphical User Interfaces](https://www.bilibili.com/video/av19035296/)
+* 27 - [3D 图形 - 3D Graphics](https://www.bilibili.com/video/av19164942/)
