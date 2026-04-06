@@ -2,14 +2,35 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "C/C++: g++ 调试",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${fileDirname}/${fileBasenameNoExtension}",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "setupCommands": [
+        {
+          "description": "为 gdb 启用整齐打印",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "C/C++: g++ 生成活动文件"
+    },
+    {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
       "externalConsole": false,
-      "cwd": "/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/lab_shell",
-      "program": "/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/lab_shell/build/Debug/outDebug",
+      "cwd": "/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/chapter30_线程同步",
+      "program": "/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/chapter30_线程同步/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
