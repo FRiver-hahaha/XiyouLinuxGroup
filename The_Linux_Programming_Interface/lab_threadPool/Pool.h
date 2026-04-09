@@ -6,15 +6,17 @@
 #include <functional>
 #include <mutex>
 
-using namespace std;
-
 class ThreadPool {
 public:
     ThreadPool(size_t TNum);
     ~ThreadPool();
 
-    void submit(<function<void()>> task,
+    void submit(std::function<void()> task, 
+    std::function<void()> callback = nullptr);
                 
-)
+private:
+    void worker();
+
+private:
 
 }
