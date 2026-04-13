@@ -5,96 +5,103 @@
 #include <condition_variable>
 #include <functional>
 #include <thread>
+#include <future>
+#include <chrono>
+#include <iomanip>
+
+// 日志打印工具（线程安全）
+inline void log(const std::string& msg) {
+    static std::mutex log_mtx;
+    std::lock_guard<std::mutex> lock(log_mtx);
+
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::cout << "[日志 " << std::put_time(std::localtime(&time), "%H:%M:%S") << "] "
+              << msg << std::endl;
+}
 
 class ThreadPool {
 public:
-    // 构造函数：创建 threadNum 个工作线程
     ThreadPool(size_t threadNum);
-
-    // 析构函数：保证所有任务执行完毕再退出
     ~ThreadPool();
 
-    // 提交任务到线程池
-    // task: 要执行的任务
-    // callback: 任务完成后的回调（可选）
-    void submit(std::function<void()> task, std::function<void()> callback = nullptr);
+    // 提交任务：支持返回值 + 明确回调 + 日志
+    template<class F, class... Args, class Callback>
+    auto submitWithCallback(F&& f, Args&&... args, Callback&& callback)
+        -> std::future<typename std::result_of<F(Args...)>::type>;
 
 private:
-    // 工作线程执行的函数
     void worker();
 
-private:
-    std::vector<std::thread> workers;       // 工作线程
-    std::queue<std::function<void()>> tasks; // 任务队列
-
-    std::mutex mtx;                   // 保护队列
-    std::condition_variable cv;       // 线程等待/唤醒
-    bool stop = false;                // 线程池关闭标志
-
-    // 任务 + 回调 打包
-    struct TaskWithCallback {
-        std::function<void()> task;
-        std::function<void()> callback;
-    };
-    std::queue<TaskWithCallback> taskQueue; // 带回调的任务队列
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool stop = false;
 };
 
-// ==================== 实现 ====================
-
+// 构造函数
 inline ThreadPool::ThreadPool(size_t threadNum) {
+    log("线程池初始化，线程数：" + std::to_string(threadNum));
     for (size_t i = 0; i < threadNum; ++i) {
         workers.emplace_back(&ThreadPool::worker, this);
     }
 }
 
+// 析构函数
 inline ThreadPool::~ThreadPool() {
     {
         std::lock_guard<std::mutex> lock(mtx);
         stop = true;
     }
-    cv.notify_all(); // 唤醒所有线程
-
+    cv.notify_all();
     for (auto& t : workers) {
-        if (t.joinable())
-            t.join();
+        if (t.joinable()) t.join();
     }
+    log("线程池已安全关闭");
 }
 
-// 提交任务（带可选回调）
-inline void ThreadPool::submit(std::function<void()> task, std::function<void()> callback) {
-    std::lock_guard<std::mutex> lock(mtx);
-    taskQueue.push({std::move(task), std::move(callback)});
-    cv.notify_one(); // 唤醒一个线程
-}
-
-// 工作线程主循环
+// 工作线程
 inline void ThreadPool::worker() {
+    log("工作线程启动");
     while (true) {
-        TaskWithCallback twc;
-
+        std::function<void()> task;
         {
             std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [this]() { return stop || !tasks.empty(); });
 
-            // 等待：有任务 或 线程池关闭
-            cv.wait(lock,  {
-                return stop || !taskQueue.empty();
-            });
-
-            // 关闭且无任务，退出
-            if (stop && taskQueue.empty())
+            if (stop && tasks.empty()) {
+                log("工作线程退出");
                 return;
-
-            // 取任务
-            twc = std::move(taskQueue.front());
-            taskQueue.pop();
+            }
+            task = std::move(tasks.front());
+            tasks.pop();
         }
-
-        // 执行任务
-        if (twc.task)
-            twc.task();
-
-        // 执行回调
-        if (twc.callback)
-            twc.callback();
+        task();
     }
+}
+
+// 提交任务（高级版：返回值 + 回调 + 日志）
+template<class F, class... Args, class Callback>
+auto ThreadPool::submitWithCallback(F&& f, Args&&... args, Callback&& callback)
+    -> std::future<typename std::result_of<F(Args...)>::type>
+{
+    using return_type = typename std::result_of<F(Args...)>::type;
+
+    auto task = std::make_shared<std::packaged_task<return_type()>>(
+        std::bind(std::forward<F>(f), std::forward<Args>(args)...)
+    );
+    std::future<return_type> res = task->get_future();
+
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        tasks.emplace([task, callback]() {
+            (*task)();
+            callback();
+            log("任务执行完成并触发回调");
+        });
+    }
+    cv.notify_one();
+    log("新任务已加入队列");
+    return res;
 }
