@@ -1,36 +1,10 @@
 #include "ThreadPool.h"
+#include "matrix.h"
+#include "factorial.h"
 
 using namespace std;
 
 // 阶乘
-uint64_t factorial(int n) {
-    uint64_t res = 1;
-    for(int i = 2; i <= n; ++i) {
-        res *= i;
-        this_thread::sleep_for(chrono::milliseconds(100));// 模拟耗时长的任务
-    }
-    return res;
-}
-
-using Matrix = vector<vector<int>>;
-// 矩阵乘法
-Matrix MatrixMultiply(const Matrix& A, const Matrix& B) {
-    int m = A.size();// 总数
-    int n = B[0].size();// 列数
-    int p = B.size();// 总数
-
-    Matrix res(m, vector<int>(n, 0));
-
-    for(int i = 0; i < m; ++i) {
-        for(int j = 0; j < n; ++j) {
-            for(int k = 0; k < p; ++k) {
-                res[i][j] += A[i][k] * B[k][j];
-            }
-        }
-    }
-
-    return res;
-}
 
 int main() {
     ThreadPool TPool(10);
