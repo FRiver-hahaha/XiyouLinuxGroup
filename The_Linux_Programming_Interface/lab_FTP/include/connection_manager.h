@@ -24,7 +24,7 @@ public:
         返回监听 Socket 的文件描述符。
         失败时抛出 std::runtime_error 异常。
     */
-   
+
     static int createServerSocket(int port) {
         int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
         if (serverSocket < 0) {
@@ -105,6 +105,11 @@ public:
         return accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
     }
     
+    /*
+        通过链表遍历电脑内的所有网络接口，
+        遇到非回环地址则返回。
+    */
+
     static std::string getLocalIP() {
         struct ifaddrs *ifaddr, *ifa;
         
@@ -120,7 +125,7 @@ public:
             if (ifa->ifa_addr->sa_family == AF_INET) {
                 struct sockaddr_in* addr = (struct sockaddr_in*)ifa->ifa_addr;
                 char ip[INET_ADDRSTRLEN];
-                inet_ntop(AF_INET, &(addr->sin_addr), ip, sizeof(ip));
+                inet_ntop(AF_INET, &(addr->sin_addr), ip, sizeof(ip));// ipv4
                 
                 std::string ipStr(ip);
                 if (ipStr != "127.0.0.1" && ipStr.find("127.") != 0) {
