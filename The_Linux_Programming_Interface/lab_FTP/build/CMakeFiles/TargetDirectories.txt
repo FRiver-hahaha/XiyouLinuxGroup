@@ -1,0 +1,3 @@
+/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/lab_FTP/build/CMakeFiles/ftp_server.dir
+/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/lab_FTP/build/CMakeFiles/edit_cache.dir
+/home/friver/gitclone/XiyouLinuxGroup/The_Linux_Programming_Interface/lab_FTP/build/CMakeFiles/rebuild_cache.dir
