@@ -95,7 +95,7 @@ public:
         struct sockaddr_in clientAddr;
         socklen_t clientLen = sizeof(clientAddr);
         memset(&clientAddr, 0, clientLen);
-        
+
         // Set timeout for accept
         struct timeval tv;
         tv.tv_sec = timeoutSeconds;
