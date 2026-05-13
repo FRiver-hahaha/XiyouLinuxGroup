@@ -102,42 +102,6 @@ public:
         }
     }
 
-    void test_commands() {
-        std::cout << "\n=== Testing Key-Value Store ===" << std::endl;
-        
-        // 测试 SET 命令
-        std::cout << "\n1. Testing SET commands:" << std::endl;
-        std::cout << send_command("SET name Alice") << std::endl;
-        std::cout << send_command("SET age 25") << std::endl;
-        std::cout << send_command("SET city Beijing") << std::endl;
-        
-        // 测试 GET 命令
-        std::cout << "\n2. Testing GET commands:" << std::endl;
-        std::cout << send_command("GET name") << std::endl;
-        std::cout << send_command("GET age") << std::endl;
-        std::cout << send_command("GET nonexistent") << std::endl;
-        
-        // 测试 LIST 命令
-        std::cout << "\n3. Testing LIST command:" << std::endl;
-        std::cout << send_command("LIST") << std::endl;
-        
-        // 测试修改
-        std::cout << "\n4. Testing UPDATE command:" << std::endl;
-        std::cout << send_command("SET age 26") << std::endl;
-        std::cout << send_command("GET age") << std::endl;
-        
-        // 测试删除
-        std::cout << "\n5. Testing DEL command:" << std::endl;
-        std::cout << send_command("DEL city") << std::endl;
-        std::cout << send_command("LIST") << std::endl;
-        
-        // 测试删除不存在的键
-        std::cout << "\n6. Testing DEL on non-existent key:" << std::endl;
-        std::cout << send_command("DEL nonexistent") << std::endl;
-        
-        std::cout << "\n=== Test Complete ===" << std::endl;
-    }
-
     void disconnect() {
         if (client_socket != -1) {
             send_command("QUIT");
@@ -171,7 +135,6 @@ int main(int argc, char* argv[]) {
     }
 
     // 运行自动测试
-    client.test_commands();
     
     // 进入交互模式
     std::cout << "\n--- Interactive Mode ---" << std::endl;
