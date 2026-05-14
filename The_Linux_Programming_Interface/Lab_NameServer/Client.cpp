@@ -24,11 +24,97 @@ bool Client::connectServer() {
 
     cout << "欢迎进入服务器 " << serverAddress << ":" << serverPort << '\n';
 
-    welcome();
-
+    // 接受消息
+    receiveResponse();
     return true;
 }
 
-void Client::welcome() {
+void Client::receiveResponse() {
+    char buffer[SIZE_BUFFER];
+    memset(buffer, 0, sizeof(buffer));
+    int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
 
+    buffer[bytesReceived] = '\0';
+
+    if(bytesReceived > 0) {
+        cout << buffer;
+    }
+}
+
+string Client::sendCommand(const string& command) {
+    if (clientSocket == -1) {
+        return "无法连接到服务器";
+    }
+
+    // 发送命令
+    string cmd = command + "\n";
+    send(clientSocket, cmd.c_str(), cmd.length(), 0);
+
+    // 接收响应
+    char buffer[SIZE_BUFFER];
+    memset(buffer, 0, sizeof(buffer));
+    int bytes_received = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+    
+    if (bytes_received > 0) {
+        string response(buffer);
+        response.erase(response.find_last_not_of("\r\n") + 1);
+        return response;
+    }
+    
+    return "链接已被服务器关闭";
+}
+
+void Client::microShell() {
+    string command;
+
+    while (true) {
+        cout << "> ";
+        std::getline(cin, command);
+        
+        if (command.empty()) {
+            continue;
+        }
+        
+        string response = sendCommand(command);
+        cout << response << '\n';
+        
+        if (command == "QUIT" || response == "Oops! BYE~") {
+            break;
+        }
+    }
+}
+
+void Client::disconnect() {
+    if(clientSocket != -1) {
+        sendCommand("QUIT");
+        close(clientSocket);
+        clientSocket = -1;
+        cout << "已关闭链接" << '\n';
+    }
+}
+
+int main(int argc, char* argv[]) {
+    std::string address = "127.0.0.1";
+    int port = 8888;
+    
+    if (argc > 1) {
+        address = argv[1];
+    }
+    if (argc > 2) {
+        port = std::stoi(argv[2]);
+    }
+
+    Client client(address, port);
+    
+    if (!client.connectServer()) {
+        std::runtime_error("无法连接到服务器");
+        return 1;
+    }
+
+    
+    // 进入交互模式
+    std::cout << "\n进入交互模式" << '\n';
+    client.microShell();
+
+    return 0;
 }

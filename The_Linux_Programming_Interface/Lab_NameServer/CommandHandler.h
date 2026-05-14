@@ -1,3 +1,6 @@
+#ifndef CMDHANDLER_H
+#define CMDHANDLER_H
+
 #include <string>
 #include <unordered_map>
 #include <functional>
@@ -34,3 +37,5 @@ public:
 private:
     void registerCmd();// 注册哈希表<string> <functional<string (const string&)>>
 };
+
+#endif

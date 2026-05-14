@@ -30,7 +30,9 @@ string CommandHandler::help() {// 获取帮助
         if(it != amanHelp.end()) {
             helpStr += "  " + it->second + '\n';
         }else {
-            helpStr += "  " + cmd + '\n';
+            if(cmd != "HELP") {
+                helpStr += "  " + cmd + '\n';
+            }
         }
     }
 
@@ -83,7 +85,7 @@ void CommandHandler::registerCmd() {// 建立哈希表
     comTofunc["HELP"] = [this](const string&) -> string {return help();};
     amanHelp["SET"] = "SET <name> <age> - 设置名字和年龄";
     amanHelp["GET"] = "GET <name> - 获取名字下的年龄";
-    amanHelp["DEL"] = "SET <name> - 删除名字";
+    amanHelp["DEL"] = "DEL <name> - 删除名字";
     amanHelp["QUIT"] = "QUIT - 离开服务器";
     amanHelp["LIST"] = "LIST - 列出名字和年龄";
 }

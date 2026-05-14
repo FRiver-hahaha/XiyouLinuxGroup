@@ -1,3 +1,6 @@
+#ifndef STORE_H
+#define STORE_H
+
 #include <unordered_map>
 #include <string>
 #include <sstream>
@@ -19,3 +22,5 @@ public:
     string del(const string& name);
     string list();
 };
+
+#endif
