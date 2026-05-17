@@ -62,7 +62,7 @@ void Server::run() {
         tv.tv_usec = 0;
         setsockopt(serverSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-        int  clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
 
         if(!running) break;
 
