@@ -4,9 +4,6 @@
 Server::Server(int port) 
     : serverSocket(-1), port(port) {
     signal(SIGPIPE, SIG_IGN);
-    signal(SIGINT, [](int) {
-        log("收到 SIGINT 信号");
-    });
 
     threadPool = std::make_unique<ThreadPool> (4);
 
@@ -15,7 +12,8 @@ Server::Server(int port)
 bool Server::start() {
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if(serverSocket < 0) {
-        log("无法创建套接字");
+        if(logCallback) logCallback("无法创建套接字");
+        else log("无法创建套接字");
         return false;
     }
 
@@ -31,28 +29,36 @@ bool Server::start() {
 
     if(bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
         close(serverSocket);
-        log("无法绑定套接字和ip地址");
+        if(logCallback) logCallback("无法绑定套接字和ip地址");
+        else log("无法绑定套接字和ip地址");
         return false;
     }
 
     if(listen(serverSocket, SOMAXCONN) < 0) {
         close(serverSocket);
-        log("无法监听");
+        if(logCallback) logCallback("无法监听");
+        else log("无法监听");
         return false;
     }
 
     printServerInfo();
 
+    if(logCallback) {
+        logCallback("服务器启动成功，监听端口: " + std::to_string(port));
+        logCallback("线程池已初始化，工作线程数: 4");
+    }
+
     return true;
 }
 
 void Server::run() {
-    ServerThread = std::thread(&Server::console, this);
+    // ServerThread = std::thread(&Server::console, this);
 
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
 
-    log("等待客户端链接...");
+    if (logCallback) logCallback("等待客户端链接...");
+    else log("等待客户端链接...");
 
     while(running) {
         memset(&clientAddr, 0, clientLen);
@@ -71,37 +77,47 @@ void Server::run() {
                 continue;  // 超时，继续循环
             }
             if(!running) break;
-            log("接受连接失败");
+            if (logCallback) logCallback("接受连接失败");
+            else log("接受连接失败");
             continue;
         }
         char clientIp[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &clientAddr.sin_addr, clientIp, INET_ADDRSTRLEN);
         int clientPort = ntohs(clientAddr.sin_port);
-        log("新客户端连接: " + string(clientIp) + ":" + std::to_string(clientPort));
+        
+        string logMsg = "新客户端连接: " + string(clientIp) + ":" + std::to_string(clientPort);
+        if (logCallback) logCallback(logMsg);
+        else log(logMsg);
 
         {
             std::lock_guard<mutex> lg(clientMutex);
             clientSockets.push_back(clientSocket);
+
+            if(clientCountCallback) clientCountCallback(clientSockets.size());
         }
 
         threadPool->submit(
             [this, clientSocket]() {
             talkWithClient(clientSocket);
         }, [this, clientSocket, clientIp, clientPort]() {
-            log("客户端断开: " + std::string(clientIp) + ":" + std::to_string(clientPort));
+            string logMsg = "客户端断开: " + std::string(clientIp) + ":" + std::to_string(clientPort);
+            if (logCallback) logCallback(logMsg);
+            else log(logMsg);
             removeClient(clientSocket);
             close(clientSocket);
         });
 
     }
 
-    log("客户端已关闭链接...");
+    if (logCallback) logCallback("服务器已停止接受新连接");
+    else log("客户端已关闭链接...");
 
-    if(ServerThread.joinable()) {
-        ServerThread.join();
-    }
+    // if(ServerThread.joinable()) {
+    //     ServerThread.join();
+    // }
 
-    log("已关闭服务器");
+    if (logCallback) logCallback("已关闭服务器");
+    else log("已关闭服务器");
 }
 
 void Server::stop() {
@@ -120,7 +136,8 @@ void Server::stop() {
     }
 
     close(serverSocket);
-    log("服务器已关闭");
+    if (logCallback) logCallback("服务器已关闭");
+    else log("服务器已关闭");
 }
 
 void Server::talkWithClient(const int clientSock) {
@@ -137,9 +154,11 @@ void Server::talkWithClient(const int clientSock) {
         
         if(bytesReceived <= 0) {
             if(bytesReceived == 0) {
-                log("客户端主动关闭");
+                if (logCallback) logCallback("客户端主动关闭");
+                else log("客户端主动关闭");
             }else {
-                log("recv错误");
+                if (logCallback) logCallback("recv错误");
+                else log("recv错误");
             }
             break;
         }
@@ -153,9 +172,17 @@ void Server::talkWithClient(const int clientSock) {
             continue;
         }
 
-        log("接收到: " + command + " 指令");
-        sentence = parseCommand(command);
+        string logMsg = "接收到: " + command + " 指令";
+        if (logCallback) logCallback(logMsg);
+        else log(logMsg);
+
+        sentence = parseCommand(command);// 解析好的命令，作为参数，发送给客户端
         send(clientSock, sentence.c_str(), sentence.length(), 0);
+
+        if (commandCallback) {
+            commandCallback(command, sentence);
+        }
+
         if(sentence == "Oops! BYE~") {
             break;
         }
@@ -225,59 +252,6 @@ void Server::printServerInfo() {
     cout << "╚════════════════════════════════════════╝\n\n";
 }
 
-void Server::console() {
-    string command;
-    
-    cout << "\n========================================" << endl;
-    cout << "  服务器管理控制台已启动" << endl;
-    cout << "  输入 'help' 查看可用命令" << endl;
-    cout << "========================================" << endl;
-    
-    while(running) {
-        cout << "\nadmin> ";
-        std::getline(cin, command);
-        
-        if(command.empty()) continue;
-        
-        if(command == "help") {
-            cout << "\n可用管理命令:" << endl;
-            cout << "  help        - 显示此帮助信息" << endl;
-            cout << "  status      - 显示服务器状态" << endl;
-            cout << "  clients     - 显示连接的客户端列表" << endl;
-            cout << "  info        - 显示服务器网络信息" << endl;
-            cout << "  quit        - 关闭服务器" << endl;
-            
-        } else if(command == "status") {
-            cout << "\n服务器状态:" << endl;
-            cout << "  运行状态: " << (running ? "运行中" : "已停止") << endl;
-            cout << "  监听端口: " << port << endl;
-            
-            size_t clientCount;
-            {
-                std::lock_guard<mutex> lock(clientMutex);
-                clientCount = clientSockets.size();
-            }
-            cout << "  连接客户端数: " << clientCount << endl;
-            
-        } else if(command == "clients") {
-            printClientList();
-            
-        } else if(command == "info") {
-            printServerInfo();
-            
-        } else if(command == "quit" || command == "exit") {
-            cout << "\n正在关闭服务器..." << endl;
-            stop();
-            break;
-            
-        } else {
-            cout << "未知命令: " << command << " (输入 'help' 查看可用命令)" << endl;
-        }
-    }
-    
-    cout << "管理控制台已关闭" << endl;
-}
-
 void Server::removeClient(const int clientSocket) {
     std::lock_guard<mutex> lg(clientMutex);
     clientSockets.erase(
@@ -286,49 +260,7 @@ void Server::removeClient(const int clientSocket) {
     );
 }
 
-void Server::printClientList() {
-    std::lock_guard<std::mutex> lock(clientMutex);
-    
-    cout << "\n当前连接的客户端 (" << clientSockets.size() << "):" << endl;
-    cout << "----------------------------------------" << endl;
-    
-    if(clientSockets.empty()) {
-        cout << "  没有客户端连接" << endl;
-    } else {
-        for(size_t i = 0; i < clientSockets.size(); ++i) {
-            cout << "  [" << i + 1 << "] Socket FD: " << clientSockets[i] << endl;
-        }
-    }
-    cout << "----------------------------------------" << endl;
-}
-
-std::atomic<bool> g_running{true};
-
-void signalHandler(int signum) {
-    if (signum == SIGINT) {
-        log("收到 SIGINT 信号");
-        g_running = false;
-    }
-}
-
-int main(int argc, char* argv[]) {
-    int port = 8888;
-    
-    if(argc > 1) {
-        port = std::stoi(argv[1]);
-    }
-
-    signal(SIGINT, signalHandler);
-    signal(SIGTERM, signalHandler);
-
-    Server server(port);
-
-    if(!server.start()) {
-        std::runtime_error("无法启动服务器");
-        return 1;
-    }
-
-    server.run();
-
-    return 0;
+int Server::getClientCount() {
+    std::lock_guard<mutex> lg(clientMutex);
+    return clientSockets.size();
 }

@@ -29,32 +29,46 @@ constexpr int SIZE_BUFFER = 1024;
 class Server {
 
     int serverSocket;
-    std::vector<int> clientSockets;
     int port;
+    std::vector<int> clientSockets;
     std::atomic<bool> running{true};
-    Store store;
-    CommandHandler cmdHandle{store};
-
     unique_ptr<ThreadPool> threadPool;
     mutex clientMutex;
     
+    Store store;
 
+    CommandHandler cmdHandle{store};
+    
     std::thread ServerThread;
+
+    std::function<void(const string&)> logCallback;      // 日志回调
+    std::function<void(int)> clientCountCallback;        // 客户端数量变化回调
+    std::function<void(const string&, const string&)> commandCallback; // 命令执行回调
 
 public:
     Server(int port = 8888);
-
+    
+    /* 传输层封装实现 */ 
     bool start();// 用来监听客户端
     void run();// 用来建立和客户端的链接
     void stop();// 用来关闭连接
     void talkWithClient(const int clientSock);// 与客户端进行i/o
     void removeClient(const int clientSocket);// 把客户端移除
-
-    void console();
-    void printClientList();
-    void printServerInfo();
-    string parseCommand(const string& command);
     std::vector<string> getLocalIps();
+    string parseCommand(const string& command);
+
+    /* 应用层封装实现 */ 
+    void printServerInfo();
+    
+    // Qt 控制接口
+    void setLogCallback(std::function<void(const string&)> callback) { logCallback = callback; };
+    void setClientCountCallback(std::function<void(int)> callback) { clientCountCallback = callback; };
+    void setCommandCallback(std::function<void(const string&, const string&)> callback) { commandCallback = callback; };
+    
+    // 获取私有变量的调用
+    int getClientCount();
+    bool isRunning() const {return running; };
+    int getPort() const {return port; };
 
     ~Server() {
         stop();

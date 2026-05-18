@@ -23,7 +23,7 @@ class Client {
 
 public:
     Client(const string& address = "127.0.0.1", int port = 8888)
-     : serverAddress(address), serverPort(port), clientSocket(-1) {}
+     : clientSocket(-1), serverPort(port), serverAddress(address) {}
 
     bool connectServer();
     void receiveResponse();
