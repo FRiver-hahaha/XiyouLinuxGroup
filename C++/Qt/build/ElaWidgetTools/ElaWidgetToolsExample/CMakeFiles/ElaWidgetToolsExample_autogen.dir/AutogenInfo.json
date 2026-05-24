@@ -1,0 +1,353 @@
+{
+	"BUILD_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample_autogen",
+	"CMAKE_BINARY_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample",
+	"CMAKE_EXECUTABLE" : "/usr/bin/cmake",
+	"CMAKE_LIST_FILES" : 
+	[
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/CMakeLists.txt",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample.qrc",
+		"/usr/share/cmake-3.31/Modules/GNUInstallDirs.cmake"
+	],
+	"CMAKE_SOURCE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt",
+	"CROSS_CONFIG" : false,
+	"DEP_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "ElaWidgetToolsExample_autogen/timestamp",
+	"HEADERS" : 
+	[
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_About.h",
+			"MU",
+			"CLKLULXE33/moc_T_About.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_BaseComponents.h",
+			"MU",
+			"CLKLULXE33/moc_T_BaseComponents.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_BasePage.h",
+			"MU",
+			"CLKLULXE33/moc_T_BasePage.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Card.h",
+			"MU",
+			"CLKLULXE33/moc_T_Card.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_ElaScreen.h",
+			"MU",
+			"CLKLULXE33/moc_T_ElaScreen.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Graphics.h",
+			"MU",
+			"CLKLULXE33/moc_T_Graphics.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Home.h",
+			"MU",
+			"CLKLULXE33/moc_T_Home.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Icon.h",
+			"MU",
+			"CLKLULXE33/moc_T_Icon.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_ListView.h",
+			"MU",
+			"CLKLULXE33/moc_T_ListView.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_LogWidget.h",
+			"MU",
+			"CLKLULXE33/moc_T_LogWidget.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Navigation.h",
+			"MU",
+			"CLKLULXE33/moc_T_Navigation.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Popup.h",
+			"MU",
+			"CLKLULXE33/moc_T_Popup.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Setting.h",
+			"MU",
+			"CLKLULXE33/moc_T_Setting.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_TableView.h",
+			"MU",
+			"CLKLULXE33/moc_T_TableView.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_TreeView.h",
+			"MU",
+			"CLKLULXE33/moc_T_TreeView.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_UpdateWidget.h",
+			"MU",
+			"CLKLULXE33/moc_T_UpdateWidget.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_IconDelegate.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_IconDelegate.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_IconModel.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_IconModel.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_ListViewModel.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_ListViewModel.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_LogModel.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_LogModel.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TableViewModel.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_TableViewModel.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TreeItem.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_TreeItem.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TreeViewModel.h",
+			"MU",
+			"HN5EUOQNKV/moc_T_TreeViewModel.cpp",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/mainwindow.h",
+			"MU",
+			"EWIEGA46WW/moc_mainwindow.cpp",
+			null
+		]
+	],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample_autogen/include",
+	"MOC_COMPILATION_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : [ "QT_CORE_LIB", "QT_GUI_LIB", "QT_WIDGETS_LIB" ],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/private",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/DeveloperComponents",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/DeveloperComponents/Command",
+		"/usr/include/x86_64-linux-gnu/qt5",
+		"/usr/include/x86_64-linux-gnu/qt5/QtWidgets",
+		"/usr/include/x86_64-linux-gnu/qt5/QtGui",
+		"/usr/include/x86_64-linux-gnu/qt5/QtCore",
+		"/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++",
+		"/usr/include/c++/14",
+		"/usr/include/x86_64-linux-gnu/c++/14",
+		"/usr/include/c++/14/backward",
+		"/usr/lib/gcc/x86_64-linux-gnu/14/include",
+		"/usr/local/include",
+		"/usr/include/x86_64-linux-gnu",
+		"/usr/include"
+	],
+	"MOC_MACRO_NAMES" : [ "Q_OBJECT", "Q_GADGET", "Q_NAMESPACE", "Q_NAMESPACE_EXPORT" ],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/g++",
+		"-std=gnu++17",
+		"-dM",
+		"-E",
+		"-c",
+		"/usr/share/cmake-3.31/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/ElaWidgetToolsExample_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : [],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 8,
+	"PARSE_CACHE_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/CMakeFiles/ElaWidgetToolsExample_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/usr/lib/qt5/bin/moc",
+	"QT_UIC_EXECUTABLE" : "/usr/lib/qt5/bin/uic",
+	"QT_VERSION_MAJOR" : 5,
+	"QT_VERSION_MINOR" : 15,
+	"SETTINGS_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetToolsExample/CMakeFiles/ElaWidgetToolsExample_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_About.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_BaseComponents.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_BasePage.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Card.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_ElaScreen.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Graphics.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Home.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Icon.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_ListView.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_LogWidget.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Navigation.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Popup.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_Setting.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_TableView.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_TreeView.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ExamplePage/T_UpdateWidget.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_IconDelegate.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_IconModel.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_ListViewModel.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_LogModel.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TableViewModel.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TreeItem.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/ModelView/T_TreeViewModel.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/main.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetToolsExample/mainwindow.cpp",
+			"MU",
+			null
+		]
+	],
+	"UIC_OPTIONS" : [],
+	"UIC_SEARCH_PATHS" : [],
+	"UIC_SKIP" : [],
+	"UIC_UI_FILES" : [],
+	"USE_BETTER_GRAPH" : false,
+	"VERBOSITY" : 0
+}

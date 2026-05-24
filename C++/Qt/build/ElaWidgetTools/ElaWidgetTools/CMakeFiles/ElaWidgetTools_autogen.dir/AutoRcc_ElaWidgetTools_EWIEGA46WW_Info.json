@@ -1,0 +1,29 @@
+{
+	"BUILD_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetTools/ElaWidgetTools_autogen",
+	"CMAKE_BINARY_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetTools",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools",
+	"CMAKE_SOURCE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "Unix Makefiles",
+	"INCLUDE_DIR" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetTools/ElaWidgetTools_autogen/include",
+	"INPUTS" : 
+	[
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/Image/Cirno.jpg",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/Image/Moon.jpg",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/Image/noise.png",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/Image/MicaBase.png",
+		"/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/Font/ElaAwesome.ttf"
+	],
+	"LOCK_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetTools/CMakeFiles/ElaWidgetTools_autogen.dir/AutoRcc_ElaWidgetTools_EWIEGA46WW_Lock.lock",
+	"MULTI_CONFIG" : false,
+	"OPTIONS" : [ "-name", "ElaWidgetTools" ],
+	"OUTPUT_CHECKSUM" : "EWIEGA46WW",
+	"OUTPUT_NAME" : "qrc_ElaWidgetTools.cpp",
+	"RCC_EXECUTABLE" : "/usr/lib/qt5/bin/rcc",
+	"RCC_LIST_OPTIONS" : [ "--list" ],
+	"SETTINGS_FILE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/build/ElaWidgetTools/ElaWidgetTools/CMakeFiles/ElaWidgetTools_autogen.dir/AutoRcc_ElaWidgetTools_EWIEGA46WW_Used.txt",
+	"SOURCE" : "/home/friver/gitclone/XiyouLinuxGroup/C++/Qt/ElaWidgetTools/ElaWidgetTools/ElaWidgetTools.qrc",
+	"USE_BETTER_GRAPH" : false,
+	"VERBOSITY" : 0
+}

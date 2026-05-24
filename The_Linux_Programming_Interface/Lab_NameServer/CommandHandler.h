@@ -6,7 +6,7 @@
 #include <functional>
 #include "Store.h"
 
-
+// 注释掉原说明
 /*
     用来解析命令行
     给每个命令绑定函数，输入对应的命令执行对应函数
@@ -17,7 +17,7 @@
 // using std::cout;    using std::endl;
 // using std::string;  using hash_map = std::unordered_map<string, string>;
 
-
+// 新增：FTP 命令处理器（简化版本，主要命令在 Server 中处理）
 class CommandHandler {
     Store& store;
 
@@ -27,15 +27,15 @@ class CommandHandler {
     hash_map amanHelp;
 
 public:
-    CommandHandler(Store& storeref) : store(storeref) {// 初始化
+    CommandHandler(Store& storeref) : store(storeref) {
         registerCmd();
     }
 
-    string execute(const string command);// 执行command下的函数
-    string help();// 查询帮助
+    string execute(const string command);
+    string help();
 
 private:
-    void registerCmd();// 注册哈希表<string> <functional<string (const string&)>>
+    void registerCmd();
 };
 
 #endif

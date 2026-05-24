@@ -10,7 +10,6 @@ string Store::get(const string& name) {
     if(it != store.end()) {
         return "OK: GET " + it->second;
     }
-
     return "ERROR: not found";
 }
 
@@ -20,7 +19,6 @@ string Store::del(const string& name) {
         store.erase(name);
         return "OK: DEL " + name;
     }
-
     return "ERROR: not found";
 }
 
@@ -30,10 +28,8 @@ string Store::list() {
     }
     std::stringstream ss;
     ss << "LIST: ";
-
     for(auto& pair : store) {
         ss << " " << pair.first << "<=>" << pair.second << '\n';
     }
-
     return ss.str();
 }
