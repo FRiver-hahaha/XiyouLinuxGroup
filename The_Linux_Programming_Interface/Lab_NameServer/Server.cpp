@@ -1,14 +1,7 @@
 #include "Server.h"
 #include <arpa/inet.h>
+#include <sstream>
 
-// 注释掉原构造函数
-// Server::Server(int port) 
-//     : serverSocket(-1), port(port) {
-//     signal(SIGPIPE, SIG_IGN);
-//     threadPool = std::make_unique<ThreadPool>(4);
-// }
-
-// 新增：FTP 服务器构造函数，初始化控制端口和数据端口
 Server::Server(int controlPort, int dataPort) 
     : controlServerSocket(-1), dataServerSocket(-1), epollFd(-1),
       controlPort(controlPort), dataPort(dataPort), nextPasvPort(PASV_PORT_BASE) {
@@ -20,11 +13,11 @@ Server::Server(int controlPort, int dataPort)
 /*
     服务端监听部分：
 
-    共分为三个部分，控制信息，数据传输，epoll监听处理
+    共分为三个部分，控制信息，数据传输，epoll 监听处理
     控制信息和数据传输的创建思路基本一致，
-    通过socket,bind,listen创建socket，监听客户端的链接，
+    通过 socket,bind,listen 创建 socket，监听客户端的链接，
     
-    epoll监听处理使用：epoll_create1,epoll_ctl处理监听
+    epoll 监听处理使用：epoll_create1,epoll_ctl 处理监听
     
 */
 
@@ -112,9 +105,9 @@ bool Server::start() {
 
 /*
     服务端执行部分：
-    使用FtpSession包装数据
-    创建一个epoll结构体，存储epoll
-    执行epoll_wait,进入epoll监听状态
+    使用 FtpSession 包装数据
+    创建一个 epoll 结构体，存储 epoll
+    执行 epoll_wait，进入 epoll 监听状态
     遇到客户端的链接就建立链接
     之后使用线程池处理客户数据
 */
@@ -199,7 +192,7 @@ void Server::run() {
 
 /*
     处理数据部分：
-    使用recv接受数据
+    使用 recv 接受数据
     如果接受成功，则进入处理数据部分
 */
 
@@ -275,8 +268,11 @@ void Server::handleFtpCommand(int clientSock, const string& command) {
         string resp = "\"" + getWorkingDir(clientSock) + "\" 是当前目录\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
     } else if(cmd == "CWD") {
-        string resp = "目录已更改\r\n";
-        send(clientSock, resp.c_str(), resp.length(), 0);
+        // 修改：实际处理目录切换逻辑
+        handleCwdCommand(clientSock, args);
+    } else if(cmd == "CDUP") {
+        // 新增：切换到父目录
+        handleCdupCommand(clientSock);
     } else if(cmd == "TYPE") {
         string resp = "类型设置为 " + args + "\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
@@ -292,12 +288,101 @@ void Server::handleFtpCommand(int clientSock, const string& command) {
         string resp = "UNIX Type: L8\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
     } else if(cmd == "FEAT") {
-        string resp = "功能列表\r\n PASV\r\n LIST\r\n RETR\r\n STOR\r\n211 END\r\n";
+        string resp = "功能列表\r\n PASV\r\n LIST\r\n RETR\r\n STOR\r\n PWD\r\n CWD\r\n CDUP\r\n211 END\r\n";
+        send(clientSock, resp.c_str(), resp.length(), 0);
+    } else if(cmd == "HELP") {
+        string resp = "支持命令:\r\n"
+                      " PASV - 进入被动模式\r\n"
+                      " LIST - 列出目录\r\n"
+                      " RETR <文件> - 下载文件\r\n"
+                      " STOR <文件> - 上传文件\r\n"
+                      " PWD - 显示当前目录\r\n"
+                      " CWD <目录> - 切换目录\r\n"
+                      " CDUP - 返回上级目录\r\n"
+                      " QUIT - 退出\r\n"
+                      "END\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
     } else {
         string resp = "命令未实现：" + cmd + "\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
     }
+}
+
+void Server::handleCwdCommand(int clientSock, const string& path) {
+    if(path.empty()) {
+        string resp = "需要目录参数\r\n";
+        send(clientSock, resp.c_str(), resp.length(), 0);
+        return;
+    }
+    
+    FtpSession* session = nullptr;
+    {
+        std::lock_guard<mutex> lg(sessionMutex);
+        auto it = sessions.find(clientSock);
+        if(it != sessions.end()) {
+            session = it->second;
+        }
+    }
+    
+    if(!session) {
+        string resp = "会话不存在\r\n";
+        send(clientSock, resp.c_str(), resp.length(), 0);
+        return;
+    }
+    
+    string newDir = session->workingDir;
+    
+    if(path[0] == '/') {
+        // 绝对路径
+        newDir = path;
+    } else {
+        // 相对路径
+        if(newDir != "/") {
+            newDir = newDir + "/" + path;
+        } else {
+            newDir = "/" + path;
+        }
+    }
+    
+    // 规范化路径
+    std::vector<string> parts;
+    std::istringstream iss(newDir);
+    string part;
+    while(std::getline(iss, part, '/')) {
+        if(part.empty() || part == ".") {
+            continue;
+        } else if(part == "..") {
+            if(!parts.empty()) {
+                parts.pop_back();
+            }
+        } else {
+            parts.push_back(part);
+        }
+    }
+    
+    newDir = "/";
+    for(size_t i = 0; i < parts.size(); i++) {
+        if(i > 0) newDir += "/";
+        newDir += parts[i];
+    }
+    
+    // 检查目录是否存在
+    DIR* dir = opendir(newDir.c_str());
+    if(dir == nullptr) {
+        string resp = "5目录不存在：" + path + "\r\n";
+        send(clientSock, resp.c_str(), resp.length(), 0);
+        return;
+    }
+    closedir(dir);
+    
+    // 更新工作目录
+    session->workingDir = newDir;
+    string resp = "目录已更改为 " + newDir + "\r\n";
+    send(clientSock, resp.c_str(), resp.length(), 0);
+}
+
+void Server::handleCdupCommand(int clientSock) {
+    handleCwdCommand(clientSock, "..");
 }
 
 string Server::getWorkingDir(int clientSock) {
@@ -352,9 +437,6 @@ int Server::allocatePasvPort() {
 }
 
 void Server::handleListCommand(int clientSock) {
-    string resp = "准备发送目录列表\r\n";
-    send(clientSock, resp.c_str(), resp.length(), 0);
-    
     FtpSession* session = nullptr;
     {
         std::lock_guard<mutex> lg(sessionMutex);
@@ -370,9 +452,9 @@ void Server::handleListCommand(int clientSock) {
         return;
     }
     
+
     int dataSock = -1;
     if(session->pasvMode && session->pasvPort > 0) {
-        // 创建监听套接字等待客户端连接
         int pasvListenSock = socket(AF_INET, SOCK_STREAM, 0);
         if(pasvListenSock >= 0) {
             int optval = 1;
@@ -381,7 +463,7 @@ void Server::handleListCommand(int clientSock) {
             struct sockaddr_in pasvAddr;
             memset(&pasvAddr, 0, sizeof(pasvAddr));
             pasvAddr.sin_family = AF_INET;
-            pasvAddr.sin_port = htons(session->pasvPort);
+            pasvAddr.sin_port = htons(session->pasvPort);  // 使用 session 保存的端口
             pasvAddr.sin_addr.s_addr = INADDR_ANY;
             
             if(bind(pasvListenSock, (struct sockaddr*)&pasvAddr, sizeof(pasvAddr)) >= 0) {
@@ -406,6 +488,9 @@ void Server::handleListCommand(int clientSock) {
         send(clientSock, errResp.c_str(), errResp.length(), 0);
         return;
     }
+
+    string resp = "准备发送目录列表\r\n";
+    send(clientSock, resp.c_str(), resp.length(), 0);
     
     string dirList = listDirectory(session->workingDir);
     
@@ -455,15 +540,10 @@ string Server::listDirectory(const string& path) {
 
 void Server::handleRetrCommand(int clientSock, const string& filename) {
     if(filename.empty()) {
-        string resp = "5需要文件名参数\r\n";
+        string resp = "需要文件名参数\r\n";
         send(clientSock, resp.c_str(), resp.length(), 0);
         return;
     }
-    
-    
-    string resp = "准备发送文件 " + filename + "\r\n";
-    send(clientSock, resp.c_str(), resp.length(), 0);
-    
     
     FtpSession* session = nullptr;
     {
@@ -475,7 +555,7 @@ void Server::handleRetrCommand(int clientSock, const string& filename) {
     }
     
     if(!session) {
-        string errResp = "无法打开数据连接\r\n";
+        string errResp = "会话不存在\r\n";
         send(clientSock, errResp.c_str(), errResp.length(), 0);
         return;
     }
@@ -488,81 +568,6 @@ void Server::handleRetrCommand(int clientSock, const string& filename) {
     string content = readFile(filePath);
     if(content.empty()) {
         string errResp = "文件不存在或无法读取：" + filename + "\r\n";
-        send(clientSock, errResp.c_str(), errResp.length(), 0);
-        return;
-    }
-    
-    // 建立数据连接并发送文件
-    int dataSock = -1;
-    if(session->pasvMode && session->pasvPort > 0) {
-        int pasvListenSock = socket(AF_INET, SOCK_STREAM, 0);
-        if(pasvListenSock >= 0) {
-            int optval = 1;
-            setsockopt(pasvListenSock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-            
-            struct sockaddr_in pasvAddr;
-            memset(&pasvAddr, 0, sizeof(pasvAddr));
-            pasvAddr.sin_family = AF_INET;
-            pasvAddr.sin_port = htons(session->pasvPort);
-            pasvAddr.sin_addr.s_addr = INADDR_ANY;
-            
-            if(bind(pasvListenSock, (struct sockaddr*)&pasvAddr, sizeof(pasvAddr)) >= 0) {
-                if(listen(pasvListenSock, 1) >= 0) {
-                    struct timeval tv;
-                    tv.tv_sec = 5;
-                    tv.tv_usec = 0;
-                    setsockopt(pasvListenSock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-                    
-                    struct sockaddr_in clientAddr;
-                    socklen_t clientLen = sizeof(clientAddr);
-                    dataSock = accept(pasvListenSock, (struct sockaddr*)&clientAddr, &clientLen);
-                }
-            }
-            close(pasvListenSock);
-        }
-    }
-    
-    if(dataSock < 0) {
-        string errResp = "无法打开数据连接\r\n";
-        send(clientSock, errResp.c_str(), errResp.length(), 0);
-        return;
-    }
-    
-    // 发送文件内容
-    sendDataToClient(dataSock, content);
-    
-    close(dataSock);
-    session->dataSock = -1;
-    
-    // 发送完成响应
-    string completeResp = "传输完成\r\n";
-    send(clientSock, completeResp.c_str(), completeResp.length(), 0);
-}
-
-// 新增：处理 STOR 上传命令
-void Server::handleStorCommand(int clientSock, const string& filename) {
-    if(filename.empty()) {
-        string resp = "需要文件名参数\r\n";
-        send(clientSock, resp.c_str(), resp.length(), 0);
-        return;
-    }
-    
-    // 发送准备接收响应
-    string resp = "准备接收文件 " + filename + "\r\n";
-    send(clientSock, resp.c_str(), resp.length(), 0);
-    
-    // 获取会话
-    FtpSession* session = nullptr;
-    {
-        std::lock_guard<mutex> lg(sessionMutex);
-        auto it = sessions.find(clientSock);
-        if(it != sessions.end()) {
-            session = it->second;
-        }
-    }
-    
-    if(!session) {
-        string errResp = "无法打开数据连接\r\n";
         send(clientSock, errResp.c_str(), errResp.length(), 0);
         return;
     }
@@ -602,6 +607,83 @@ void Server::handleStorCommand(int clientSock, const string& filename) {
         send(clientSock, errResp.c_str(), errResp.length(), 0);
         return;
     }
+    
+    string resp = "准备发送文件 " + filename + " (" + std::to_string(content.length()) + " 字节)\r\n";
+    send(clientSock, resp.c_str(), resp.length(), 0);
+    
+    // 发送文件内容
+    sendDataToClient(dataSock, content);
+    
+    close(dataSock);
+    session->dataSock = -1;
+    
+    // 发送完成响应
+    string completeResp = "传输完成\r\n";
+    send(clientSock, completeResp.c_str(), completeResp.length(), 0);
+}
+
+// 新增：处理 STOR 上传命令
+void Server::handleStorCommand(int clientSock, const string& filename) {
+    if(filename.empty()) {
+        string resp = "需要文件名参数\r\n";
+        send(clientSock, resp.c_str(), resp.length(), 0);
+        return;
+    }
+    
+    // 获取会话
+    FtpSession* session = nullptr;
+    {
+        std::lock_guard<mutex> lg(sessionMutex);
+        auto it = sessions.find(clientSock);
+        if(it != sessions.end()) {
+            session = it->second;
+        }
+    }
+    
+    if(!session) {
+        string errResp = "会话不存在\r\n";
+        send(clientSock, errResp.c_str(), errResp.length(), 0);
+        return;
+    }
+    
+    // 建立数据连接
+    int dataSock = -1;
+    if(session->pasvMode && session->pasvPort > 0) {
+        int pasvListenSock = socket(AF_INET, SOCK_STREAM, 0);
+        if(pasvListenSock >= 0) {
+            int optval = 1;
+            setsockopt(pasvListenSock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+            
+            struct sockaddr_in pasvAddr;
+            memset(&pasvAddr, 0, sizeof(pasvAddr));
+            pasvAddr.sin_family = AF_INET;
+            pasvAddr.sin_port = htons(session->pasvPort);
+            pasvAddr.sin_addr.s_addr = INADDR_ANY;
+            
+            if(bind(pasvListenSock, (struct sockaddr*)&pasvAddr, sizeof(pasvAddr)) >= 0) {
+                if(listen(pasvListenSock, 1) >= 0) {
+                    struct timeval tv;
+                    tv.tv_sec = 5;
+                    tv.tv_usec = 0;
+                    setsockopt(pasvListenSock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+                    
+                    struct sockaddr_in clientAddr;
+                    socklen_t clientLen = sizeof(clientAddr);
+                    dataSock = accept(pasvListenSock, (struct sockaddr*)&clientAddr, &clientLen);
+                }
+            }
+            close(pasvListenSock);
+        }
+    }
+    
+    if(dataSock < 0) {
+        string errResp = "无法打开数据连接\r\n";
+        send(clientSock, errResp.c_str(), errResp.length(), 0);
+        return;
+    }
+    
+    string resp = "准备接收文件 " + filename + "\r\n";
+    send(clientSock, resp.c_str(), resp.length(), 0);
     
     // 接收文件内容
     string content = receiveDataFromClient(dataSock, 1024 * 1024);
@@ -762,6 +844,9 @@ void Server::printServerInfo() {
     cout << "║  LIST - 列出目录                        ║\n";
     cout << "║  RETR - 下载文件                        ║\n";
     cout << "║  STOR - 上传文件                        ║\n";
+    cout << "║  PWD - 显示当前目录                     ║\n";
+    cout << "║  CWD - 切换目录                         ║\n";
+    cout << "║  CDUP - 返回上级目录                    ║\n";
     cout << "║  QUIT - 退出                            ║\n";
     cout << "╚════════════════════════════════════════╝\n\n";
 }

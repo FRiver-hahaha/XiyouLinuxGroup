@@ -106,15 +106,7 @@ string Client::listFiles() {
         return "无法进入被动模式";
     }
     
-    // 发送 LIST 命令
-    string response = sendFtpCommand("LIST");
-    
-    // 检查响应码
-    if(response.substr(0, 3) != "150") {
-        return "LIST 命令失败：" + response;
-    }
-    
-    // 连接到数据端口
+    // 先连接到数据端口（在发送 LIST 之前）
     dataSocket = socket(AF_INET, SOCK_STREAM, 0);
     if(dataSocket < 0) {
         return "无法创建数据套接字";
@@ -129,7 +121,17 @@ string Client::listFiles() {
     if(connect(dataSocket, (struct sockaddr*)&dataAddr, sizeof(dataAddr)) < 0) {
         close(dataSocket);
         dataSocket = -1;
-        return "无法连接到数据端口";
+        return "无法连接到数据端口 " + pasvHost + ":" + std::to_string(pasvPort);
+    }
+    
+    // 发送 LIST 命令
+    string response = sendFtpCommand("LIST");
+    
+    // 检查响应码（150 或 125 都表示准备发送）
+    if(response.substr(0, 3) != "150" && response.substr(0, 3) != "125") {
+        close(dataSocket);
+        dataSocket = -1;
+        return "LIST 命令失败：" + response;
     }
     
     // 接收目录列表
@@ -145,7 +147,8 @@ string Client::listFiles() {
     }
     
     // 关闭数据连接
-    closeDataConnection();
+    close(dataSocket);
+    dataSocket = -1;
     
     return result;
 }
@@ -293,12 +296,18 @@ void Client::closeDataConnection() {
 void Client::microShell() {
     string command;
 
-    cout << "\nFTP 支持命令:\n";
-    cout << "  list              - 列出远程文件\n";
-    cout << "  get <filename>    - 下载文件\n";
-    cout << "  put <filename>    - 上传文件\n";
-    cout << "  pasv              - 进入被动模式\n";
-    cout << "  quit              - 退出\n\n";
+    cout << "\n╔════════════════════════════════════════╗\n";
+    cout << "║       欢迎使用简易 FTP 客户端            ║\n";
+    cout << "╠════════════════════════════════════════╣\n";
+    cout << "║ 支持命令：                              ║\n";
+    cout << "║  list              - 列出远程文件       ║\n";
+    cout << "║  get <文件名>       - 下载文件          ║\n";
+    cout << "║  put <文件名>       - 上传文件          ║\n";
+    cout << "║  cd <目录>          - 切换目录          ║\n";
+    cout << "║  pwd               - 显示当前目录       ║\n";
+    cout << "║  help              - 显示帮助           ║\n";
+    cout << "║  quit              - 退出               ║\n";
+    cout << "╚════════════════════════════════════════╝\n\n";
 
     while (true) {
         cout << "ftp> ";
@@ -311,16 +320,34 @@ void Client::microShell() {
         // 解析本地命令
         if(command == "quit" || command == "exit") {
             sendFtpCommand("QUIT");
+            cout << "已断开连接\n";
             break;
-        } else if(command == "list") {
+        } else if(command == "list" || command == "ls") {
             string result = listFiles();
-            cout << result << '\n';
+            if(result.empty()) {
+                cout << "目录为空\n";
+            } else {
+                cout << result << '\n';
+            }
         } else if(command.substr(0, 4) == "get ") {
             string filename = command.substr(4);
-            downloadFile(filename);
+            if(!downloadFile(filename)) {
+                cout << "下载失败：" << filename << "\n";
+            }
         } else if(command.substr(0, 4) == "put ") {
             string filename = command.substr(4);
-            uploadFile(filename);
+            if(!uploadFile(filename)) {
+                cout << "上传失败：" << filename << "\n";
+            }
+        } else if(command.substr(0, 3) == "cd ") {
+            string dirname = command.substr(3);
+            sendFtpCommand("CWD " + dirname);
+        } else if(command == "cdup" || command == "cd ..") {
+            sendFtpCommand("CDUP");
+        } else if(command == "pwd") {
+            sendFtpCommand("PWD");
+        } else if(command == "help" || command == "?") {
+            sendFtpCommand("HELP");
         } else if(command == "pasv") {
             pasvMode();
         } else {

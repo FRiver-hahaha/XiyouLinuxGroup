@@ -74,6 +74,8 @@ public:
     void handleListCommand(int clientSock);                        // 处理 LIST 列目录命令
     void handleRetrCommand(int clientSock, const string& filename); // 处理 RETR 下载命令
     void handleStorCommand(int clientSock, const string& filename); // 处理 STOR 上传命令
+    void handleCwdCommand(int clientSock, const string& path);     // 处理 CWD 切换目录命令
+    void handleCdupCommand(int clientSock);                        // 处理 CDUP 返回上级命令
 
     void sendDataToClient(int dataSock, const string& data);       // 发送数据到客户端
     string receiveDataFromClient(int dataSock, size_t maxBytes);   // 从客户端接收数据
