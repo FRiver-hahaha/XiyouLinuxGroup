@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/ftp_server.dir/link.d CMakeFiles/ftp_server.dir/src/main.cpp.o CMakeFiles/ftp_server.dir/src/ftp_server.cpp.o -o ftp_server  -lstdc++fs
