@@ -1,42 +1,38 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <iterator>
-#include <sstream>
+using namespace std;
 
-class TEST {
+class Transform {
 public:
-    int square(int x) {
-        return x * x;
-    }
-
-    int qube(int x) {
-        return x * x * x;
-    }
-
-    int noName(int x) {
-        return x - (x * 3 + 1) * 2;
+    int operator()(int val) {
+        return val;
     }
 };
 
-int main() {
-    TEST test;
-    std::stringstream ss;
-    std::vector<int> input{1, 2, 3, 4, 5};
-    std::vector<int> output;
+class print01 {
+public:
+    void operator()(int val) {
+        cout << val << " ";
+    }
+};
 
-    std::transform(
-        input.begin(),
-        input.end(),
-        std::back_inserter(output),
-        [&test](int x) {return test.square(x);}
-    );
+void test01() {
+    vector<int> vec;
 
-    for(int val : output) {
-        ss << val << ' ';
+    for(int i = 0; i < 10; ++i) {
+        vec.push_back(i);
     }
 
-    std::cout << ss.str() << std::endl;
+    vector<int> vec_target;
+    vec_target.resize(vec.size()); // 需要提前开辟空间
 
+    transform(vec.begin(), vec.end(), vec_target.begin(), Transform());
+    for_each(vec.begin(), vec.end(), print01());
+
+}   
+
+int main() {
+    test01();
     return 0;
 }
